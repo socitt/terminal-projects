@@ -64,22 +64,99 @@ problem, not specific to wheel fetching. `//tools/plz_test_runner:_runner#zip`
 (a plain, dependency-free `python_library` zip step) failed with the
 same `signal: hangup` as everything else when tested directly.
 
-## `shared/term_test.py` not yet confirmed passing
+**Also not the fix (ruled out 2026-07-26, later same session):** the
+theory that this is Please's Go runtime threading interacting badly
+with iSH-AOK's process emulation (motivated by the "worse in a tight
+loop" observation above). Tested two ways, 10 fresh-shell attempts of
+`plz test //shared:term_test --rerun` each:
+
+- `GOMAXPROCS=1` env var: 0/10 passed.
+- `numthreads = 1` under `[build]` in `.plzconfig`: 0/10 passed.
+
+Neither improved on baseline; both batches were run back-to-back with
+zero passes, vs. the previously measured ~50-60%. Note these specific
+runs were also contaminated by the process-leak hazard described just
+below, discovered only after both batches completed, so treat this as
+suggestive rather than a clean disproof — but combined with ~15
+further clean attempts afterward (system verified free of stray
+processes) that also produced zero passes, there's no evidence either
+setting helps. Neither was kept (`.plzconfig` has no `[build]` section;
+no `GOMAXPROCS` set in `pleasew`).
+
+**New hazard identified 2026-07-26:** a `plz`/`pleasew` invocation that
+hangs (e.g. `plz help flags`, which does not return) and gets
+backgrounded/abandoned rather than killed will keep running
+indefinitely and can itself degrade the success rate of *every
+subsequent* `plz` call in that session — one such stray process
+accumulated over 11 CPU-minutes and, combined with 9 siblings, drove
+free memory on the device down to ~56MB out of ~7.65GB before it was
+noticed. Always confirm a `plz`/`pleasew` invocation has actually
+exited (`ps aux | grep please`) before treating it as abandoned; kill
+it explicitly (`kill -9`) rather than letting it run in the
+background.
+
+**Mitigation (added 2026-07-26): `scripts/plz-retry.sh`.** Since
+retrying is the only working mitigation and doing it manually is
+tedious, `scripts/plz-retry.sh <plz args...>` wraps any `plz`/`pleasew`
+invocation, retrying up to 5 times (fresh subshell per attempt, short
+sleep between), and only reports failure once every attempt is
+exhausted. Route `plz build`/`plz test` calls through this rather than
+calling `./pleasew` directly. Note: in the same session the two
+threading experiments above were run in, `//shared:term_test` failed
+100% of the time across roughly 45 total attempts (well beyond 5) even
+after the stray-process hazard was cleared — worse than the ~50-60%
+baseline documented for a bare genrule, plausibly because this target
+requires a longer subprocess chain (build the `plz_test_runner` zip,
+build the test binary, run it, then write *and read back* a results
+file — more chances to hit the race) and/or genuinely worse ambient
+device conditions that day. If `plz-retry.sh` exhausts all 5 attempts,
+re-invoking it again is a reasonable next step, not a sign something
+is actually broken.
+
+## `shared/term_test.py`: code confirmed correct, clean `plz test` pass still not achieved
 
 Per this repo's working rules (see `docs/ACTIVE_SESSION.md`), every
 module needs a passing test before being considered done. `shared/term.py`,
 `shared/term_test.py`, and `shared/BUILD` are written and believed
-correct (the logic is simple and was reasoned through by hand), but
-`plz test //shared:term_test` has not been confirmed to actually run
-to completion, because of the issue above.
+correct (the logic is simple and was reasoned through by hand).
 
-This is a deliberate, logged exception to the "test must pass first"
-rule — the rule exists to prevent silently broken commits, not to
-block on an environment issue that has nothing to do with the code
-under test. Do not repeat this pattern silently for other modules;
-each instance should get its own note here (or a new entry) explaining
-why the test couldn't be run.
+**Update 2026-07-26:** across dozens of attempts (direct, and via
+`scripts/plz-retry.sh`), `plz test //shared:term_test` has never
+returned a passing exit code this session — but several of the
+failures were extremely informative. On at least two occasions, the
+underlying `unittest` run completed and printed its full output before
+Please's own results-file capture step hit `signal: hangup`:
 
-**To close this out:** once `plz test //shared:term_test` can be run
-reliably (or even once, with `--rebuild`, to prove it's not a stale
-cache hit), confirm it passes and remove this section.
+```
+test_center_line_centers_text ... ok
+test_default_width_fits_narrow_terminal ... ok
+test_hr_repeats_char ... ok
+test_pad_line_pads_short_text ... ok
+test_pad_line_truncates_long_text ... ok
+
+Ran 5 tests in 0.02s
+
+OK
+```
+```
+ERROR: //shared:term_test failed: Test failed to produce output results file
+```
+
+This confirms `shared/term.py` and `shared/term_test.py` are correct —
+all 5 tests genuinely pass — and narrows the hangup's failure point
+specifically to Please's post-test results-file write/read step (not
+just "some build action," as the general entry above already
+suspected, but specifically the plumbing *after* the test binary has
+already finished successfully).
+
+This is still a deliberate, logged exception to the "test must pass
+first" rule — the rule exists to prevent silently broken commits, not
+to block on an environment issue that has nothing to do with the code
+under test. The code is verified correct by direct observation of the
+test run above, even though a green `plz test` exit code has not yet
+been captured. Do not repeat this pattern silently for other modules;
+each instance should get its own note here explaining why.
+
+**To close this out:** once `plz test //shared:term_test` (ideally via
+`scripts/plz-retry.sh`) returns a passing exit code, confirm it and
+remove this section.
