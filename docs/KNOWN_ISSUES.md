@@ -113,6 +113,43 @@ device conditions that day. If `plz-retry.sh` exhausts all 5 attempts,
 re-invoking it again is a reasonable next step, not a sign something
 is actually broken.
 
+**Also not the fix (ruled out 2026-07-26, later same session): HLE Accel
+(arm64/riscv64) toggled on.** Device setting change — HLE Accel
+(arm64/riscv64) toggled ON, amd64 JIT toggled OFF (irrelevant, we run
+native aarch64 not amd64) — prompted a fresh measurement batch to see
+if it affects the SIGHUP rate. Method: confirmed no stray
+`plz`/`please` processes first (`ps aux | grep -i please`, clean), then
+ran `scripts/plz-retry.sh test //shared:term_test --rerun` (note: the
+originally-planned `--rebuild` flag doesn't exist for `plz test`,
+confirmed via `./pleasew test --help` — `--rebuild` is `plz
+build`-only; `--rerun` is the test-command equivalent and is what the
+GOMAXPROCS/numthreads batches above actually used) 10 times, fresh
+shell process per attempt, same methodology as those prior batches.
+
+Result: **0/10 passed.** Since `scripts/plz-retry.sh` itself retries
+up to 5 times internally, this batch represents 50 total underlying
+`pleasew test` invocations, all 50 of which failed. Failure signature
+identical to before HLE Accel was toggled — `signal: hangup` after the
+test binary completes, then `Test failed to produce output results
+file` / `failed to read test results file: Didn't find any test
+results in plz-out/tmp/shared/term_test._test/run_1/test.results`.
+Example:
+
+```
+Error: TestFailed in term_test
+Test failed
+signal: hangup
+//shared:term_test 1 test run in 68ms; 0 passed, 1 errored
+```
+
+No improvement over the documented 0%-across-~45-attempts baseline for
+this target. HLE Accel is not the fix; not kept as a variable to
+control for (it's a device-level setting, not something this repo
+configures). Given this and the two ruled-out threading theories above,
+root-causing further from the userspace/build-config side looks like a
+dead end — see the draft upstream issue
+(`docs/DRAFT_ISH_AOK_ISSUE.md`) for the path forward.
+
 ## `shared/term_test.py`: code confirmed correct, clean `plz test` pass still not achieved
 
 Per this repo's working rules (see `docs/ACTIVE_SESSION.md`), every
