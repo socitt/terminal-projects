@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bazel --version)",
+      "Bash(java -version)",
+      "Bash(exit 0 *)",
+      "Read(//usr/lib/**)",
+      "Bash(apk --version)",
+      "Read(//proc/**)",
+      "Bash(apk update *)",
+      "Bash(apk search *)",
+      "Bash(apk info *)",
+      "Read(//etc/apk/**)",
+      "Bash(ping -c1 -W2 8.8.8.8)",
+      "Bash(wget -q --spider https://github.com)",
+      "Bash(apk add *)",
+      "Bash(rm -f hs_err_pid*.log core.*)",
+      "Bash(java -Xint -version)",
+      "Bash(/usr/lib/jvm/java-11-openjdk/bin/java -version)",
+      "Bash(/usr/lib/jvm/java-21-openjdk/bin/java -version)",
+      "Bash(setarch -R /usr/lib/jvm/java-17-openjdk/bin/java -version)",
+      "Bash(java -Xshare:off -XX:-UseCompressedOops -XX:ReservedCodeCacheSize=32m -Xmx64m -version)",
+      "Bash(wget -qO- https://please.build)",
+      "Bash(wget -qO- https://api.github.com/repos/please-build/please/releases/latest)",
+      "Bash(wget -qO- \"https://api.github.com/search/repositories?q=please+build+in:name\")",
+      "Bash(wget -qO- \"https://api.github.com/orgs/please-build/repos?per_page=100\")",
+      "Bash(wget -qO- \"https://api.github.com/repos/thought-machine/please/releases/latest\")",
+      "Bash(mkdir -p /tmp/claude-0/-git-terminal-projects/eef34e05-a8c8-4518-a3b8-3c4f9ec011d8/scratchpad/please-test)",
+      "Bash(wget -q https://github.com/thought-machine/please/releases/download/v17.31.2/please_17.31.2_linux_arm64 -O please)",
+      "Bash(chmod +x please)",
+      "Bash(./please --version)",
+      "Bash(python3 *)"
+    ]
+  }
+}
