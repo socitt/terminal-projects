@@ -160,6 +160,38 @@ settings screen (if it logs anything at this level) is a native iOS
 GUI feature not reachable from a shell/CLI session — would need to be
 checked directly in the app by whoever has the device in hand.
 
+**Follow-up attempt: `strace -f`, ruled out as impractical here.**
+Installed `strace` via `apk add strace` (asked first since it's a
+system package outside the repo's declared dependencies) and tried to
+capture a live hangup with
+`strace -f -tt -o trace.log ./pleasew test //shared:term_test --rerun`.
+Two attempts:
+
+- Attempt 1: no `timeout` wrapper, hard-timed-out at the tool's 5-minute
+  ceiling. The trace log shows the traced process tree actually
+  exited (status 7, matching the usual `signal: hangup`-style failure)
+  only ~4-5s in, but the `strace`-wrapped command itself never
+  returned control afterward for the remaining ~4.9 minutes.
+- Attempt 2: wrapped in `timeout 60`, still didn't return within 60s;
+  the partial trace after 60+s had only reached `pleasew`'s early
+  startup config-file checks (`openat .../plzconfig` ENOENT checks),
+  a phase that normally takes low tens of ms untraced. Also notable:
+  `SIGCHLD` siginfo in the trace reports `si_utime`/`si_stime` values
+  in the hundreds of *seconds* of CPU time for what should be
+  near-instant syscalls — consistent with generally broken
+  clock/CPU-time accounting under iSH-AOK's aarch64 emulation, though
+  not confirmed as related to the hangup itself.
+
+No stray processes were left behind either time (`ps aux` clean after
+both). Conclusion: `ptrace`-based tracing (via `strace`) introduces
+overhead severe enough in this environment (or interacts with the same
+underlying emulation issue) that it isn't a practical way to observe
+the hangup directly — ruled out as a capture method, not attempted
+further. This is itself circumstantial supporting evidence for "the
+emulation layer has fundamental issues with process lifecycle
+syscalls," useful context for the draft upstream issue even without a
+clean capture.
+
 ## `shared/term_test.py`: code confirmed correct, clean `plz test` pass still not achieved
 
 Per this repo's working rules (see `docs/ACTIVE_SESSION.md`), every
