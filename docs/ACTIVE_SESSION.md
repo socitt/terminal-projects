@@ -165,6 +165,16 @@ Note: the requested `--rebuild` flag doesn't exist for `plz test`
 is what prior batches in `docs/KNOWN_ISSUES.md` actually used for test
 targets (`--rebuild` is a `plz build`-only flag).
 
+**Result: HLE Accel does not fix it.** 0/10 batch (50 total underlying
+invocations via `scripts/plz-retry.sh`'s internal retries), identical
+`signal: hangup` / missing-results-file signature as before. Full
+writeup in `docs/KNOWN_ISSUES.md`. Checked for any accessible
+syscall/signal log to strengthen the draft issue — `/proc/ish/*` and
+`dmesg` have nothing at that granularity, no `strace`/`ltrace`
+installed, and the iSH-AOK app's own Diagnostics screen (if it has
+anything useful) is a GUI feature this CLI session can't reach.
+Committed and pushed (`abe3f54`, `73befdb`, `f948a25`).
+
 ## Pending: draft upstream issue awaiting review
 
 `docs/DRAFT_ISH_AOK_ISSUE.md` is a drafted GitHub issue for
