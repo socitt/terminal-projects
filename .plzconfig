@@ -1,0 +1,8 @@
+; Please config file
+;
+; Pinned to the version confirmed working under iSH-AOK. Anyone running
+; `plz` (or `./pleasew`, which doesn't even need plz preinstalled) in this
+; repo gets exactly this version — same idea as Bazel pinning a version in
+; .bazelversion, for reproducibility across machines.
+[please]
+version = 17.31.2
