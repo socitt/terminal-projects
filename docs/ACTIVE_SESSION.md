@@ -46,17 +46,31 @@ as a clean start.
   (`21bc9ad`).
 - Created root `README.md` (purpose, constraints, Please-vs-Bazel
   rationale), committed + pushed (`ba91354`).
+- Ran `plz init`, pinned Please to version 17.31.2 in `.plzconfig`
+  (reproducibility, like a Bazel `.bazelversion`), added the `pleasew`
+  wrapper script, added `.gitignore` for `plz-out`, and added a minimal
+  root `BUILD` file (no targets yet — each subpackage will define its
+  own). Verified with `plz build //...` (succeeds, no targets).
+  Committed + pushed (`e9f65af`).
 
 ## In progress
 
-- About to set up Please build config / root `BUILD` file.
+- About to start the `shared/` library stub (terminal rendering +
+  single-keypress input helpers).
+
+## Open question to resolve before/at that step
+
+- Please's Python rules (`python_library`, `python_test`, etc.) live in
+  a separate plugin (`plz init plugin python`), which pulls it from the
+  network. Per working rules, need to ask before adding it, since it's
+  a new dependency even though it's Please tooling rather than a game
+  library.
 
 ## Next up (in order)
 
-1. Please build config / root `BUILD` file. (current step)
-2. `shared/` library stub (terminal rendering + single-keypress input
-   helpers).
-3. Stub folder + README + minimal BUILD + stub entrypoint, each as its
+1. `shared/` library stub (terminal rendering + single-keypress input
+   helpers) — including asking about the Python plugin above.
+2. Stub folder + README + minimal BUILD + stub entrypoint, each as its
    own committed piece, for:
    - `weather-narrative`
    - `board-games` (subfolders: tictactoe, connect4, backgammon, go,
