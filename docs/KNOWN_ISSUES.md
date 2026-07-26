@@ -150,6 +150,16 @@ root-causing further from the userspace/build-config side looks like a
 dead end — see the draft upstream issue
 (`docs/DRAFT_ISH_AOK_ISSUE.md`) for the path forward.
 
+**Attempted, not accessible from this session: a syscall/signal-level
+log for the moment of the hangup.** Checked `/proc/ish/*` (only
+exposes device metadata — battery, host info, JIT toggles, network
+interfaces, iSH-AOK version — nothing signal/syscall-level) and
+`dmesg` (only the one boot line, nothing per-process). No
+`strace`/`ltrace` installed. The iSH-AOK app's own "Diagnostics"
+settings screen (if it logs anything at this level) is a native iOS
+GUI feature not reachable from a shell/CLI session — would need to be
+checked directly in the app by whoever has the device in hand.
+
 ## `shared/term_test.py`: code confirmed correct, clean `plz test` pass still not achieved
 
 Per this repo's working rules (see `docs/ACTIVE_SESSION.md`), every
