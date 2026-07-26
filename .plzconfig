@@ -12,3 +12,10 @@ preloadsubincludes = ///python//build_defs:python
 
 [Plugin "python"]
 Target = //plugins:python
+; Default python_test runner is stdlib-only unittest, wired to
+; //tools/plz_test_runner instead of Please's built-in `unittest`
+; runner. The built-in one depends on the xmlrunner/portalocker
+; wheels, whose fetch/repackage build step hangs under iSH-AOK
+; (signal: hangup) — see docs/KNOWN_ISSUES.md.
+TestRunner = tools.plz_test_runner.runner.run
+TestrunnerDeps = //tools/plz_test_runner:runner
