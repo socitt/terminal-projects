@@ -51,5 +51,8 @@ inline in that part of the repo.
 - `docs/ACTIVE_SESSION.md` — running session log, used to resume work
   after a crash. If you're picking up an interrupted session, read this
   first.
+- `docs/KNOWN_ISSUES.md` — logged environment limitations that aren't
+  fixed yet, and any deliberate exceptions to working rules taken
+  because of them.
 
 Each tool/game directory has its own README with specifics.
