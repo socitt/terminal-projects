@@ -175,6 +175,16 @@ installed, and the iSH-AOK app's own Diagnostics screen (if it has
 anything useful) is a GUI feature this CLI session can't reach.
 Committed and pushed (`abe3f54`, `73befdb`, `f948a25`).
 
+With user confirmation, installed `strace` (`apk add strace`) and
+tried to capture a live hangup via `strace -f`. Ruled out as
+impractical: two attempts both failed to return in reasonable time
+(one hit the tool's 5-minute ceiling, the other still hadn't returned
+under a `timeout 60` wrapper), and the partial trace showed severe
+overhead plus abnormal CPU-time accounting rather than a clean capture
+of the hangup moment. No stray processes left behind either time.
+Logged as circumstantial supporting evidence for the draft issue.
+Committed and pushed (`2dab368`).
+
 ## Pending: draft upstream issue awaiting review
 
 `docs/DRAFT_ISH_AOK_ISSUE.md` is a drafted GitHub issue for

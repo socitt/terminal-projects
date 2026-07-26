@@ -173,6 +173,31 @@ particularly around process-group/session boundaries. This is a
 hypothesis based on the observed timing, not a confirmed root cause —
 we have not instrumented iSH-AOK or Please internals to verify it.
 
+## Additional data point: HLE Accel setting and `strace` overhead
+
+A later session on the same device toggled the "HLE Accel"
+(arm64/riscv64) device setting on and re-ran the `//shared:term_test`
+batch (10 fresh-shell attempts via the retry wrapper, 50 total
+underlying invocations counting its internal retries): 0/50 passed,
+identical failure signature to the baseline above. HLE Accel does not
+change the behavior.
+
+Also tried attaching `strace -f` to a `plz test` invocation to capture
+the exact syscall/signal sequence at the moment of the hangup. This
+turned out to be impractical rather than informative on its own: two
+attempts both failed to return in a reasonable time (one ran past a
+5-minute ceiling, another still hadn't returned under a `timeout 60`
+wrapper) even though the underlying traced process tree in the first
+attempt exited after only ~4-5 seconds — the tracing supervisor itself
+never returned control afterward. The partial trace captured before
+giving up also showed `SIGCHLD` siginfo reporting `si_utime`/`si_stime`
+values in the hundreds of seconds of CPU time for syscalls that should
+be near-instant. Not confirmed as directly related to the `signal:
+hangup` root cause, but consistent with the emulation layer having
+broader issues around process lifecycle/signal accounting under
+`ptrace`, so flagging it here in case it's a useful additional signal
+for whoever investigates further.
+
 ## Open question: where does this belong?
 
 Genuinely unclear whether this is:
