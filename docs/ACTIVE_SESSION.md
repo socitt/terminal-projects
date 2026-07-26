@@ -42,20 +42,21 @@ as a clean start.
 
 - Verified repo state (clean, only `LICENSE` + `.claude/` present).
 - Verified `plz --version` works (17.31.2).
-- Created this file.
+- Created `docs/ACTIVE_SESSION.md` (this file), committed + pushed
+  (`21bc9ad`).
+- Created root `README.md` (purpose, constraints, Please-vs-Bazel
+  rationale), committed + pushed (`ba91354`).
 
 ## In progress
 
-- Nothing yet — about to commit this file.
+- About to set up Please build config / root `BUILD` file.
 
 ## Next up (in order)
 
-1. Commit + push this file. (current step)
-2. Root README (purpose, constraints, Please-not-Bazel rationale).
-3. Please build config / root BUILD file.
-4. `shared/` library stub (terminal rendering + single-keypress input
+1. Please build config / root `BUILD` file. (current step)
+2. `shared/` library stub (terminal rendering + single-keypress input
    helpers).
-5. Stub folder + README + minimal BUILD + stub entrypoint, each as its
+3. Stub folder + README + minimal BUILD + stub entrypoint, each as its
    own committed piece, for:
    - `weather-narrative`
    - `board-games` (subfolders: tictactoe, connect4, backgammon, go,
