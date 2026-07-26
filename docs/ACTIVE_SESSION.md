@@ -151,6 +151,20 @@ Corrected list, in order:
    `scripts/plz-retry.sh test //shared:term_test` next time it's
    convenient, but not a blocker for the above.
 
+## In progress (2026-07-26, later same day)
+
+Device setting change: HLE Accel (arm64/riscv64) toggled ON, amd64 JIT
+toggled OFF (irrelevant — we run native aarch64). Running a fresh
+10-attempt `scripts/plz-retry.sh test //shared:term_test` batch to see
+if HLE Accel affects the `signal: hangup` rate, per
+`docs/KNOWN_ISSUES.md`. Confirmed no stray `plz`/`please` processes
+before starting (`ps aux | grep -i please`, clean).
+
+Note: the requested `--rebuild` flag doesn't exist for `plz test`
+(confirmed via `./pleasew test --help`); using `--rerun` instead, which
+is what prior batches in `docs/KNOWN_ISSUES.md` actually used for test
+targets (`--rebuild` is a `plz build`-only flag).
+
 ## Pending: draft upstream issue awaiting review
 
 `docs/DRAFT_ISH_AOK_ISSUE.md` is a drafted GitHub issue for
