@@ -151,6 +151,17 @@ Corrected list, in order:
    `scripts/plz-retry.sh test //shared:term_test` next time it's
    convenient, but not a blocker for the above.
 
+## Pending: draft upstream issue awaiting review
+
+`docs/DRAFT_ISH_AOK_ISSUE.md` is a drafted GitHub issue for
+`github.com/emkey1/ish-AOK`, based on the SIGHUP findings in
+`docs/KNOWN_ISSUES.md` — environment details, a minimal `genrule`
+repro, everything confirmed/ruled out, and the post-exit
+results-file-step finding with terminal output. **This is a draft
+only** — it has not been filed anywhere (no `gh`/GitHub API used) and
+is pending the user's review before submission. Don't file it without
+being explicitly asked to.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
