@@ -6,3 +6,9 @@
 ; .bazelversion, for reproducibility across machines.
 [please]
 version = 17.31.2
+
+[parse]
+preloadsubincludes = ///python//build_defs:python
+
+[Plugin "python"]
+Target = //plugins:python
