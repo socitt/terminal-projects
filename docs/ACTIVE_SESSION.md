@@ -29,6 +29,10 @@ below and continue from there.
   `-m`. Merges/rebases handled non-interactively.
 - Every new target/module needs a minimal test before being considered
   done; run it and confirm it passes before committing.
+- Route `plz build`/`plz test` invocations through
+  `scripts/plz-retry.sh <args...>` rather than calling `./pleasew`/`plz`
+  directly — it retries flaky `signal: hangup` failures (fresh subshell
+  per attempt). See `docs/KNOWN_ISSUES.md` for why this is necessary.
 - This log gets updated before and after every step.
 
 ## Status: STARTING FRESH
@@ -52,6 +56,17 @@ as a clean start.
   root `BUILD` file (no targets yet — each subpackage will define its
   own). Verified with `plz build //...` (succeeds, no targets).
   Committed + pushed (`e9f65af`).
+- Tried two experiments to narrow the SIGHUP root cause per the
+  Go-runtime-threading-vs-iSH-process-emulation theory: `GOMAXPROCS=1`
+  and `numthreads = 1` in `.plzconfig`, 10 fresh-shell attempts each.
+  Neither improved on baseline (0/10 each); neither was kept. Full
+  detail, plus a process-leak hazard discovered mid-experiment and a
+  new finding narrowing the hangup to Please's post-test results-file
+  step specifically, in `docs/KNOWN_ISSUES.md`.
+- Added `scripts/plz-retry.sh`: wraps any `plz`/`pleasew` invocation,
+  retries up to 5 times (fresh subshell per attempt), only reports
+  failure once exhausted. This is now the standing mitigation for the
+  SIGHUP issue — see updated working rules above.
 
 ## In progress
 
@@ -89,14 +104,16 @@ resuming this. Summary:
 ## Open question to resolve before/at next step
 
 - How to get `//shared:term_test` (or any `python_test`) to actually
-  run to completion reliably under iSH-AOK. Now believed to need one
-  of:
-  - A real fix/understanding of the fork/exec race (see
-    `docs/KNOWN_ISSUES.md`) — possibly worth reporting upstream to
-    Please and/or iSH-AOK.
-  - A pragmatic retry wrapper around `plz`/`pleasew` invocations, since
-    failures are racy rather than deterministic (~50-60% success per
-    attempt was measured for a trivial target this session).
+  return a passing exit code reliably under iSH-AOK. Root cause still
+  not fixed (GOMAXPROCS/numthreads experiments ruled out, see
+  `docs/KNOWN_ISSUES.md`), and root-causing this further is no longer
+  the plan — `scripts/plz-retry.sh` is now the standing mitigation.
+  Code correctness is no longer in question: multiple captured runs
+  show the actual `unittest` suite completing with all 5 tests passing
+  before Please's own results-file step hangs. A genuinely passing
+  `plz test` exit code has not yet been captured this session despite
+  ~45 attempts; keep retrying via `scripts/plz-retry.sh` when next
+  picking this up, but don't block further work on it.
 - Please's Python rules (`python_library`, `python_test`, etc.) — the
   plugin itself is already added (`aeba897`), so this question from
   before is resolved.
@@ -119,23 +136,20 @@ Corrected list, in order:
 
 ## Next up (in order)
 
-1. `shared/term.py` + `shared/term_test.py` + `shared/BUILD` are being
-   committed this session as a logged exception (see
-   `docs/KNOWN_ISSUES.md`) — test not yet confirmed passing due to the
-   SIGHUP blocker. First thing on resume: try `plz test
-   //shared:term_test` again (retry a few times, fresh shell per
-   attempt, per the workaround in `docs/KNOWN_ISSUES.md`). If it
-   passes, remove the "not yet confirmed passing" note from
-   `docs/KNOWN_ISSUES.md`.
+1. Start on `board-games` (stub folder + README + minimal BUILD + stub
+   entrypoint), per the reordered priority above and per explicit
+   user instruction (2026-07-26) to move on from the SIGHUP
+   investigation regardless of outcome. Use `scripts/plz-retry.sh` for
+   any `plz build`/`plz test` calls.
 2. `shared/input.py` (single-keypress input helper) — same
-   stub → test → commit pattern. Same SIGHUP caveat likely applies;
-   don't silently skip the test again — log it same as above if hit.
-3. Then start on `board-games` (stub folder + README + minimal BUILD +
-   stub entrypoint), per the reordered priority above.
-4. If the SIGHUP flakiness keeps costing time, consider writing a
-   small retry wrapper script around `plz`/`pleasew` invocations
-   (see `docs/KNOWN_ISSUES.md` for measured success rates) rather than
-   re-diagnosing it from scratch each time.
+   stub → test → commit pattern, whenever picked up. Same SIGHUP
+   caveat likely applies; use `scripts/plz-retry.sh` and don't
+   silently skip the test — log it same as `shared/term_test.py` if a
+   clean pass isn't captured.
+3. `//shared:term_test` still hasn't returned a passing `plz test` exit
+   code this session (see `docs/KNOWN_ISSUES.md`) — worth another
+   `scripts/plz-retry.sh test //shared:term_test` next time it's
+   convenient, but not a blocker for the above.
 
 ## Open questions
 
