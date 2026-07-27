@@ -239,3 +239,53 @@ each instance should get its own note here explaining why.
 **To close this out:** once `plz test //shared:term_test` (ideally via
 `scripts/plz-retry.sh`) returns a passing exit code, confirm it and
 remove this section.
+
+## `lirk` dogfooding on this target (2026-07-27): different failure, not resolved by switching tools
+
+`lirk` (a separate, minimal build tool, cloned at `../lirk`, built
+specifically to avoid the process-group/session-control patterns
+suspected of causing the Please hangup above — see its README for the
+design rationale) was pointed at the same `shared/term.py` /
+`shared/term_test.py` target this session, via a new `shared/BUILD.lirk`
+added alongside the existing Please `shared/BUILD` (which is untouched
+and remains the historical record of the SIGHUP saga above).
+
+`lirk build //shared:term` passes immediately. `lirk test
+//shared:term_test` **fails 10/10** in fresh-shell attempts — but this
+is not the same failure mode. It is 100% deterministic
+(`ModuleNotFoundError: No module named 'shared'`), not racy, and has
+nothing to do with process/session handling:
+
+```
+ImportError: Failed to import test module: term_test
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/git/terminal-projects/shared/term_test.py", line 3, in <module>
+    from shared import term
+ModuleNotFoundError: No module named 'shared'
+```
+
+**Root cause:** `lirk`'s `run_test` (`lirk/actions.py`) runs
+`python3 -m unittest <module>` with `cwd` set to the target's own
+package directory and no `PYTHONPATH` adjustment. That only makes
+modules flat inside that same directory importable — confirmed as the
+intended model by `lirk`'s own test fixtures
+(`tests/fixtures/sample_repo/a/test_a.py` does `from a import greet`,
+not a root-relative import). `shared/term_test.py`, on the other hand,
+uses `from shared import term` — a root-relative import, matching the
+convention Please's Python rules use (and probably the more portable
+convention generally, since it doesn't collide across packages that
+happen to share a filename).
+
+**Verdict: not a resolved comparison.** `lirk` correctly avoids the
+Please hangup (no `signal: hangup`, no results-file step at all — it
+fails or passes in one direct `subprocess.run()`), but v1 can't
+actually run this existing test file as-is. This is a `lirk` bug/gap
+(import model too narrow for root-relative imports), not an
+environment flakiness issue, and not something to debug or work around
+from this repo — it's being taken back to the `lirk` repo separately.
+Neither `shared/term_test.py` nor `shared/BUILD` (the Please target)
+were modified to work around this. `shared/BUILD.lirk` stays in this
+repo as the reproduction case for that follow-up.
