@@ -899,14 +899,81 @@ games' rule-validation shape.
 
 `lirk build //...`: **31/31** targets clean.
 
+## Done (2026-07-27): `adventure-engine/stories/train-mystery`
+
+- Design: hub-and-spoke shape (deliberately different from dungeon's
+  linear-with-detours layout) — a corridor hub with three self-looping
+  clue rooms (dining/sleeper/cargo car, one clue item each) and a
+  confrontation scene where the correct accusation (the widow) is
+  gated on a single `requires_items` list of all 3 clues — exercises a
+  different engine feature than dungeon's single-flag gate.
+- `story.py` — 8 scenes, 3 endings (`ending_solved`,
+  `ending_wrong_conductor`, `ending_wrong_stranger`). Same BFS-
+  reachability verification as dungeon before committing (all 8
+  scenes, all 3 endings reachable). Committed `2af1b73`.
+- `main.py` — thin wrapper, same shape as dungeon's. Manually verified
+  end-to-end via piped playthroughs to all 3 endings and a save/resume
+  cycle. Committed `6d7b77d`.
+- `main_test.py` — 5 subprocess-based integration tests: full case
+  solved, wrong-suspect endings (both), the widow-accusation option
+  confirmed absent with zero clues, and — the most interesting one —
+  a single run that reaches confrontation with only 2 of 3 clues
+  (confirms "Accuse the widow" absent, and that "Keep investigating"
+  has renumbered to key 3 not 4, the same gated-choice-renumbering
+  gotcha dungeon's `vault_entrance` test hit), gathers the third clue,
+  returns to confrontation, and confirms the option has now appeared
+  in the *same run* — split on the repeated "Time to accuse someone."
+  scene text to isolate the two visits' choice menus. One assertion
+  needed a case-sensitivity fix (checked lowercase "the real killer"
+  against a sentence-initial "The real killer..."), caught by the
+  first standalone run. Committed `1765b35`.
+- `BUILD.lirk` — same `story`/`main`/`main_test` shape as dungeon.
+  `lirk test //adventure-engine/stories/train-mystery:main_test`:
+  **10/10** fresh-shell, cache-cleared runs. Committed `723b3bb`.
+
+**Full-repo confirmation:** `lirk build //...` — 34/34 targets clean.
+`lirk test //...` — 16/16 tests pass (4 adventure-engine + 10 across
+the 5 board games + 2 shared).
+
+**Docs:** `adventure-engine/README.md`, `stories/dungeon/README.md`,
+`stories/train-mystery/README.md` added (state model, gating/effect
+fields, per-story scene/ending counts and which engine feature each
+leans on). `.gitignore` updated for runtime-generated `save.json`
+files. Root `README.md` already described `adventure-engine`
+correctly from before this session, no change needed there.
+Committed `0ffc00b`.
+
+**lirk dogfooding, closed out for this target:** appended closing
+notes to `../lirk/docs/dogfooding/2026-07-27-adventure-engine.md`
+(still uncommitted there, per convention) — confirmed the "different
+shape of content" question from the top of that file: lirk's
+`library`/`test` target model handles a mostly-big-dict-literal source
+file exactly like any other Python source, no friction. Also noted the
+first 2-level cross-package fan-in in this repo (`stories/dungeon` and
+`stories/train-mystery` both depending on `//adventure-engine:runner`,
+which itself has its own cross-package deps) worked cleanly with no
+diamond-dependency or cache-staleness issue across repeated
+cache-cleared batches. No lirk bugs found this session.
+
+## Priority list status (2026-07-27, updated)
+
+1. `shared/` — **done**.
+2. `board-games` — **done**.
+3. `adventure-engine` — **done**: engine (`engine.py`/`runner.py`,
+   mutation-verified) plus both planned story packs (`dungeon`,
+   `train-mystery`), each with real branching content, ASCII art
+   tested at the narrow-terminal width, BFS-verified scene/ending
+   reachability, and subprocess-based integration tests.
+4. `weather-narrative`, `world-events-tracker` — bonus, still last, in
+   that order (per the original reordering). Neither started; no
+   design decisions made yet for either.
+
 ## Next up
 
-- `stories/train-mystery` — whodunit on a train, same shape as
-  dungeon: style-test ASCII art first, design + BFS-verify the scene/
-  clue graph before writing final content, `story.py` -> `main.py` ->
-  `main_test.py` -> `BUILD.lirk`, same per-file commit discipline. No
-  design decisions made yet for its actual content/branching map
-  (suspects, clues, accusation logic).
+- `weather-narrative` (or `world-events-tracker`, order TBD — both are
+  bonus/stretch per the standing priority list) — start fresh with a
+  scope discussion before writing code, same as every prior project.
+  No existing design decisions to build on for either.
 
 ## Open questions
 
