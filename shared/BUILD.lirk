@@ -1,0 +1,10 @@
+[[target]]
+name = "term"
+type = "library"
+srcs = ["term.py"]
+
+[[target]]
+name = "term_test"
+type = "test"
+srcs = ["term_test.py"]
+deps = [":term"]
