@@ -10,6 +10,5 @@ and `shared/input.py`.
 - `go/` — two-player, same-screen Go on a 9x9 board (no Japanese
   territory scoring or full superko; see `go/README.md` for the
   scope note).
-
-Planned next, same layout pattern (game logic as pure `library`
-functions + `test`, entrypoint as a thin `main.py`): chess.
+- `chess/` — two-player, same-screen chess on a standard 8x8 board;
+  see `chess/README.md` for details.
