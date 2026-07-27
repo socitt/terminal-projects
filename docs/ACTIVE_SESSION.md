@@ -363,6 +363,31 @@ Per the reordered list further down this file:
   entrypoint, `BUILD.lirk`, `lirk test` confirmed via multiple
   fresh-shell runs, commit.
 
+## In progress (2026-07-27, new session): `board-games/backgammon`
+
+Fresh session start: confirmed via `git log`/`git status` that the repo
+is exactly where the prior session left it (nothing to resume), pulled
+`../lirk` (already up to date at `428c517`, no new commits — the
+separate "honest usage assessment" work in that repo, per
+`../lirk/docs/LIRK_ASSESSMENT.md`, is being deferred per user decision
+in favor of continuing to dogfood lirk against real targets here).
+
+Starting `backgammon`, same `board.py` → `board_test.py` → `main.py` →
+`BUILD.lirk` pattern as `tictactoe`/`connect4`. Explicit scope decision
+this session: implementing full core rules (movement, hits, bar entry,
+bearing off with the exact-or-overshoot rule, doubles-as-4-moves) but
+**not** the doubling cube — that's a separate state machine (offer/
+accept/decline, cube ownership, cube value) that adds significant
+complexity for a local two-player terminal game and isn't needed for
+the core ruleset to be correct and playable. Noting this explicitly
+per the "whatever the actual ruleset needs" instruction rather than
+silently dropping it.
+
+Also, per explicit instruction this session, committing each file
+separately (`board.py`, `board_test.py`, `BUILD.lirk`, `main.py`) as
+its own commit+push, rather than one bundled commit per target the way
+`tictactoe` (`9e2bc95`) and `connect4` (`3cec08c`) were actually done.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
