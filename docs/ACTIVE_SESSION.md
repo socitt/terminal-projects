@@ -477,6 +477,62 @@ a ko scenario) interactively via `python3` against the real
 rather than hand-deriving and hoping the by-hand liberty count is
 right.
 
+## Done (2026-07-27): `board-games/go`
+
+- `board.py` — `group_and_liberties` (flood-fill), `apply_move`
+  (placement, captures, suicide rule, optional simple-ko check via a
+  `previous_board` arg), `is_legal_move` (try/except wrapper reusing
+  `apply_move` rather than a second parallel rule implementation),
+  `score`/`winner` (area/Chinese scoring, komi). Committed `8138406`.
+- `board_test.py` — 31 tests. Verified the snapback (suicide-looking-
+  but-legal-via-capture) and ko fixtures interactively against the
+  real `board.py` via `python3` first, rather than hand-deriving —
+  both matched exactly on the first construction. Caught one real bug
+  while writing the territory-scoring test itself (not a `board.py`
+  bug): the first version only placed black stones, so the *entire*
+  rest of the empty board legitimately counted as black territory
+  (correct engine behavior — one giant connected region touching only
+  black), not the small isolated pocket the test meant to isolate;
+  fixed by adding a distant white stone so the giant remainder reads
+  as neutral. Ran directly via `python3 -m unittest` first (31/31
+  green after the fix) before wiring into `lirk`. Committed `2a14aeb`.
+- `main.py` — coordinates via two single-digit prompts (column, then
+  row), `P` to pass, two consecutive passes end the game. Verified
+  end-to-end via piped input, two scenarios: an illegal-move-then-
+  pass-pass game showing correct scoring (neutral territory, komi
+  applied only to white), and a real sequential capture (black fills
+  white's corner stone's last liberty across two moves, confirmed
+  removed from the rendered board). Both ran clean, exit 0, no
+  tracebacks. Committed `650f42c`.
+- `BUILD.lirk` — same shape as the other board-games targets.
+  Sanity-checked before committing. Committed `442902a`.
+- `README.md` (go + updated `board-games/README.md`) — documents the
+  9x9/area-scoring/simple-ko scope decisions. Committed `456bf87`.
+
+**Test rigor:** `lirk test //board-games/go:board_test` — **10/10**
+fresh-subshell runs, `.lirk-cache.json` deleted before each. `lirk
+build //...`: all 16 targets across `shared/`, `tictactoe/`,
+`connect4/`, `backgammon/`, and `go/` build clean.
+
+## Priority list status (2026-07-27, updated)
+
+1. `shared/` — **done**.
+2. `board-games` — **in progress**: `tictactoe`, `connect4`,
+   `backgammon`, `go` done; `chess` still to come, same pattern.
+3. `adventure-engine` — not started.
+4. `weather-narrative`, `world-events-tracker` — bonus, still last.
+
+## Next up
+
+- `board-games/chess` — last `board-games` entry, same pattern: pure
+  logic module + test, thin `main.py` entrypoint, `BUILD.lirk`,
+  `lirk test` confirmed via multiple fresh-shell runs, commit per
+  file per this session's instruction. Chess has its own bug-prone
+  areas worth verifying interactively before writing tests the same
+  way go's snapback/ko fixtures were: check/checkmate/stalemate
+  detection, castling (both sides, through-check and rook-moved/king-
+  moved invalidation), en passant, and pawn promotion.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
