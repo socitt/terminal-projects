@@ -455,6 +455,28 @@ still resolves correctly with the new cross-package deps
   confirmed via multiple fresh-shell runs, commit per file per this
   session's instruction.
 
+## In progress (2026-07-27, continued): `board-games/go`
+
+Scope decision, logged before writing code: 9x9 board (standard
+beginner/competitive size — 19x19 doesn't fit a ~30-40 col terminal
+or a single-key+Enter coordinate-entry scheme reasonably). Full core
+ruleset: stone placement, group/liberty tracking, captures, the
+suicide rule (illegal to self-capture unless the move captures
+opponent stones first — "snapback"-style moves are legal), simple ko
+(can't immediately recreate the board position from just before the
+opponent's last move). Scoring: area/Chinese-style (stones + fully-
+surrounded empty territory) rather than Japanese territory scoring,
+since the latter requires a dead-stone-removal negotiation phase
+that's a UI/protocol problem more than a rules one — out of scope
+here. Komi 5.5 (standard for 9x9, avoids score ties).
+
+Given how bug-prone group/liberty/capture logic is, verifying tricky
+fixtures (a snapback-style legal-suicide-that-captures scenario, and
+a ko scenario) interactively via `python3` against the real
+`board.py` functions before committing them to `board_test.py`,
+rather than hand-deriving and hoping the by-hand liberty count is
+right.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
