@@ -8,3 +8,14 @@ name = "term_test"
 type = "test"
 srcs = ["term_test.py"]
 deps = [":term"]
+
+[[target]]
+name = "input"
+type = "library"
+srcs = ["input.py"]
+
+[[target]]
+name = "input_test"
+type = "test"
+srcs = ["input_test.py"]
+deps = [":input"]
