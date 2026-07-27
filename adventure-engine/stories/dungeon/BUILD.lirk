@@ -1,0 +1,16 @@
+[[target]]
+name = "story"
+type = "library"
+srcs = ["story.py"]
+
+[[target]]
+name = "main"
+type = "library"
+srcs = ["main.py"]
+deps = [":story", "//adventure-engine:runner"]
+
+[[target]]
+name = "main_test"
+type = "test"
+srcs = ["main_test.py"]
+deps = [":main"]
