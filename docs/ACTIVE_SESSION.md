@@ -290,6 +290,55 @@ Committed and pushed (`e714c45`).
 `input_test` both confirmed reliably passing. Moving to `board-games`
 next, starting with `tictactoe`, same pattern.
 
+Also fixed `shared/README.md` (`e370290`): its `input.py` description
+predated the actual implementation and claimed raw single-keypress
+reads with no Enter, which isn't reliable via the iOS on-screen
+keyboard and isn't what got built. Also updated to point at
+`BUILD.lirk` as where `term`/`input` are now built and tested.
+
+## Done (2026-07-27): `board-games/tictactoe` — first board-games target
+
+`board-games/` didn't exist yet; created it plus `tictactoe/` as the
+first game, per the reordered priority list below. Layout mirrors
+`shared/`: pure logic + tests, thin I/O entrypoint.
+
+- `board.py` — pure functions (`new_board`, `apply_move`, `winner`,
+  `is_draw`), no I/O.
+- `board_test.py` — 16 tests (row/column/diagonal wins, draws, invalid
+  moves, no-mutation).
+- `main.py` — terminal entrypoint, imports `shared.term` /
+  `shared.input` (repo root added to `sys.path` at the top, since the
+  script isn't run through `lirk`'s `PYTHONPATH` injection — that only
+  applies to `lirk test` invocations). Manually verified end-to-end
+  with a piped-input playthrough to a win (`X` on the diagonal),
+  output rendered correctly.
+- `BUILD.lirk` — `board` (library), `board_test` (test, deps `:board`),
+  `main` (library, deps `:board`, `//shared:term`, `//shared:input` —
+  first cross-package dependency this repo has exercised in `lirk`).
+
+`lirk build //...`: all 7 targets across `shared/` and
+`board-games/tictactoe/` build clean — confirms cross-package label
+resolution works, not just single-package targets.
+`lirk test //board-games/tictactoe:board_test`: **10/10** fresh-shell,
+cache-cleared runs. Committed and pushed (`9e2bc95`).
+
+## Priority list status (2026-07-27)
+
+Per the reordered list further down this file:
+
+1. `shared/` — **done**, both `term`/`input` green under `lirk`.
+2. `board-games` — **in progress**: `tictactoe` done; `connect4`,
+   `backgammon`, `go`, `chess` still to come, same pattern.
+3. `adventure-engine` — not started.
+4. `weather-narrative`, `world-events-tracker` — bonus, still last.
+
+## Next up
+
+- `board-games/connect4` (or whichever board-games entry is picked up
+  next), same pattern: pure logic module + test, thin `main.py`
+  entrypoint, `BUILD.lirk`, `lirk test` confirmed via multiple
+  fresh-shell runs, commit.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
