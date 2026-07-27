@@ -240,6 +240,28 @@ each instance should get its own note here explaining why.
 `scripts/plz-retry.sh`) returns a passing exit code, confirm it and
 remove this section.
 
+**Update 2026-07-27 — resolved via `lirk`, not via `plz`:** `plz test
+//shared:term_test` itself was never made to pass this session or the
+next — that avenue was abandoned in favor of dogfooding `lirk` (see
+below and the SIGHUP section above). For a clean comparison on the
+exact same target:
+
+- `plz test //shared:term_test`: **0 clean passing exit codes** across
+  ~45+ attempts over two sessions (2026-07-26), despite the underlying
+  `unittest` run itself completing all 5 tests successfully on at
+  least two of those attempts (output above) — Please's own
+  results-file step is what never came back clean.
+- `lirk test //shared:term_test`: **20/20** passing exit codes across
+  two independent 10-run batches (fresh shell + cleared cache each
+  run), one measured in the `lirk` repo, one measured here — see the
+  `lirk` dogfooding section below for the full writeup, including the
+  bug that caused the first `lirk` batch to fail and its fix.
+
+This section is being left in place rather than deleted, per this
+repo's "don't rewrite history" convention — it's the record of why
+`shared/term.py` sat in a "correct but unconfirmed" state for as long
+as it did, and why the project moved to `lirk` in the first place.
+
 ## `lirk` dogfooding on this target (2026-07-27): different failure, not resolved by switching tools
 
 `lirk` (a separate, minimal build tool, cloned at `../lirk`, built
@@ -279,13 +301,47 @@ convention Please's Python rules use (and probably the more portable
 convention generally, since it doesn't collide across packages that
 happen to share a filename).
 
-**Verdict: not a resolved comparison.** `lirk` correctly avoids the
-Please hangup (no `signal: hangup`, no results-file step at all — it
-fails or passes in one direct `subprocess.run()`), but v1 can't
-actually run this existing test file as-is. This is a `lirk` bug/gap
-(import model too narrow for root-relative imports), not an
-environment flakiness issue, and not something to debug or work around
-from this repo — it's being taken back to the `lirk` repo separately.
+**Verdict at the time: not a resolved comparison.** `lirk` correctly
+avoided the Please hangup (no `signal: hangup`, no results-file step
+at all — it fails or passes in one direct `subprocess.run()`), but v1
+couldn't actually run this existing test file as-is. This was a `lirk`
+bug/gap (import model too narrow for root-relative imports), not an
+environment flakiness issue, and not something debugged or worked
+around from this repo — it was taken back to the `lirk` repo
+separately (`../lirk/FINDINGS.md`, since deleted there once triaged).
 Neither `shared/term_test.py` nor `shared/BUILD` (the Please target)
-were modified to work around this. `shared/BUILD.lirk` stays in this
+were modified to work around this. `shared/BUILD.lirk` stayed in this
 repo as the reproduction case for that follow-up.
+
+**Update 2026-07-27 — fixed upstream in `lirk`, now a resolved
+comparison:** The `lirk` repo fixed the bug above (missing
+`PYTHONPATH` injection for root-relative imports — `run_test` in
+`lirk/actions.py` now sets `env["PYTHONPATH"]` to the repo root before
+invoking `python3 -m unittest`) and reported it verified there:
+20/20 across two independent 10-run batches, plus `lirk`'s own full
+test suite still green.
+
+Re-confirmed independently from this side after `git -C ../lirk pull`
+(landed at commit `428c517`, "Fix lirk test failing on root-relative
+imports"): **10/10** passing exit codes, fresh shell per attempt,
+`.lirk-cache.json` deleted before every single run (not just once) to
+force a genuine re-execution rather than a cache hit — the same
+false-positive trap the pty-wrapper lead fell into earlier in this
+saga (see the SIGHUP section above). Full output on a clean run:
+
+```
+  built  //shared:term
+  PASS   //shared:term_test
+lirk: OK
+```
+
+**Net result: `lirk` succeeds reliably on the exact target Please
+never returned a clean exit code for.** Please: 0 passing exit codes
+across ~45+ attempts (code independently confirmed correct by hand
+and by output inspection, per the section above). `lirk`: 20/20 across
+two sessions and two independent measurement batches (10 in the `lirk`
+repo, 10 here), 0 failures once the import-model bug was fixed. This
+is the first target in this repo to go from "written, correct, but
+never a clean green test run" to "actually green," and it's `lirk`'s
+narrower subprocess model — not a code fix to `shared/term.py` or
+`shared/term_test.py`, both unchanged throughout — that got it there.
