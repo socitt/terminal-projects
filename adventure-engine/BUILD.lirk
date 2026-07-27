@@ -8,3 +8,15 @@ name = "engine_test"
 type = "test"
 srcs = ["engine_test.py"]
 deps = [":engine"]
+
+[[target]]
+name = "runner"
+type = "library"
+srcs = ["runner.py"]
+deps = [":engine", "//shared:term", "//shared:input"]
+
+[[target]]
+name = "runner_test"
+type = "test"
+srcs = ["runner_test.py"]
+deps = [":runner"]
