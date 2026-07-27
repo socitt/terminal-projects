@@ -1,0 +1,16 @@
+[[target]]
+name = "board"
+type = "library"
+srcs = ["board.py"]
+
+[[target]]
+name = "board_test"
+type = "test"
+srcs = ["board_test.py"]
+deps = [":board"]
+
+[[target]]
+name = "main"
+type = "library"
+srcs = ["main.py"]
+deps = [":board", "//shared:term", "//shared:input"]
