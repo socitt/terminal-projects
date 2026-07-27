@@ -699,10 +699,74 @@ Also started `../lirk/docs/dogfooding/2026-07-27-chess.md` (uncommitted
 in the lirk repo, per the standing hand-off convention) — logging real
 lirk usage experience as chess proceeds, separate from this file.
 
+## Done (2026-07-27): `board-games/chess` complete — board-games priority item finished
+
+- `main.py` — algebraic-notation entrypoint: squares entered as two
+  single-key prompts each (file letter a-h, then rank digit 1-8),
+  matching go's column/row split pattern. Promotion piece (q/r/b/n)
+  prompted only when a pawn move actually reaches the last rank.
+  Verified end-to-end via a piped Fool's Mate playthrough (f2-f3 e7-e5
+  g2-g4 Qd8-h4#) — board rendered correctly (rank 8 on top, a-h file
+  labels), checkmate detected, clean exit. Committed `42ef0a6`.
+- `main_test.py` — 2 subprocess-based integration tests, both
+  hand-verified live against the real script before encoding (same
+  discipline as go's snapback/ko fixtures):
+  - Illegal-move retry (a2-a5, rejected as a 3-square pawn jump) then
+    Fool's Mate to checkmate.
+  - A queenside pawn-storm promotion (a4, axb5, b6, b7, bxa8=Q —
+    promoting by capturing black's own rook) followed by a standard
+    Scholar's-Mate pattern on the kingside (e4, Bc4, Qh5, Qxf7#).
+    Black's king never moves and stays boxed in by its own untouched
+    d7/e7/f7/d8/f8 pieces the whole game (never touched by either
+    side's scripted moves), so the final undefended check is
+    immediately mate — verified this reasoning against the real engine
+    interactively (via `board.py` directly) before committing to the
+    full move list, rather than hand-deriving legality by memory.
+  Both scenarios: exit 0, no tracebacks. Deliberately scoped to
+  integration wiring only (rendering, prompt flow, illegal-move retry,
+  promotion prompt, clean checkmate ending) — deep rule coverage
+  (castling, en passant, promotion mechanics) stays in `board_test.py`'s
+  55 tests, consistent with the effort level of the other 4 games'
+  `main_test.py` files. Committed `0ab6909`.
+- `BUILD.lirk` — same `board`/`board_test`/`main`/`main_test` shape as
+  every other game, `main` depending on `//shared:term`/`//shared:input`.
+  `lirk test //board-games/chess:board_test` and `:main_test`: **10/10**
+  fresh-shell, cache-cleared runs each, no flakiness. Committed `59d58b5`.
+- `README.md` (chess + updated `board-games/README.md`, removing the
+  stale "planned next: chess" line since it's now done). Committed
+  `888b2e1`.
+
+**Full-repo confirmation:** `lirk build //...` — 24/24 targets clean.
+`lirk test //...` — 12/12 tests pass.
+
+**lirk dogfooding, closed out for this target:** appended final entries
+to `../lirk/docs/dogfooding/2026-07-27-chess.md` (still uncommitted
+there, per convention) — timed `board_test`/`main_test` through `lirk
+test` vs standalone (lirk adds a flat ~2.7-3.2s per-invocation overhead
+regardless of suite size, consistent with backgammon's earlier note;
+not a correctness issue), and confirmed nothing about chess's added
+complexity (55 tests, 8x8 stateful board, cross-package deps,
+algebraic I/O) stressed lirk's model beyond what the simpler 4 games
+already exercised. That file is a hand-off for a future lirk session,
+not something to act on further from this side.
+
+## Priority list status (2026-07-27, updated)
+
+1. `shared/` — **done**.
+2. `board-games` — **done**: `tictactoe`, `connect4`, `backgammon`,
+   `go`, `chess` all complete, same pattern throughout (pure logic +
+   `board_test.py`, thin `main.py` + `main_test.py`, `BUILD.lirk`,
+   `README.md`), all green under `lirk`.
+3. `adventure-engine` — not started.
+4. `weather-narrative`, `world-events-tracker` — bonus, still last.
+
 ## Next up
 
-- `main.py` (algebraic-notation input, promotion prompt), `main_test.py`,
-  `BUILD.lirk`, `README.md` — same per-file commit+push discipline.
+- `adventure-engine` (`stories/`: dungeon, train-mystery) is next per
+  the reordered priority list — board-games is fully done. No design
+  decisions made yet for this; start fresh next session with a scope
+  discussion the same way chess's castling/en passant/promotion scope
+  was decided up front before writing code.
 
 ## Open questions
 
