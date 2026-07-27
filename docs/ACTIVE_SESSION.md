@@ -388,6 +388,73 @@ separately (`board.py`, `board_test.py`, `BUILD.lirk`, `main.py`) as
 its own commit+push, rather than one bundled commit per target the way
 `tictactoe` (`9e2bc95`) and `connect4` (`3cec08c`) were actually done.
 
+## Done (2026-07-27): `board-games/backgammon`
+
+State representation: `{"points": [0]*25, "bar": {"X","O"}, "off":
+{"X","O"}}`, points 1-24 (index 0 unused), positive = X count,
+negative = O count. X moves 24→1 (home 1-6), O moves 1→24 (home
+19-24), matching the standard mirrored starting layout.
+
+- `board.py` — pure functions: `new_game`, movement (`can_move`/
+  `move_checker`), hits (lone opposing checker sent to bar),
+  mandatory bar re-entry (`can_enter_from_bar`/`enter_from_bar`, must
+  clear the bar before any other move), bearing off
+  (`can_bear_off`/`bear_off`, exact-die-or-overshoot-if-no-farther-
+  checker rule, mirrored correctly for both players), `dice_to_moves`
+  (doubles → 4 moves), `roll_dice` (takes an injectable rng),
+  `legal_actions` (enumerates actions for a die — used by both
+  `main.py` and the tests). Committed `d602ddc`.
+- `board_test.py` — 60 tests, run directly via `python3 -m unittest`
+  first (60/60 green) before wiring into `lirk`, same discipline as
+  connect4's caught-a-test-bug lesson. Deliberately exercised the
+  edge cases likely to hide bugs the way connect4's did: a blot
+  (single opposing checker, not blocking) vs. a made point (2+,
+  blocking) are different in `is_blocked`/`can_move`; a fully closed
+  board (opponent holds all 6 entry points with 2+ each) blocks every
+  die 1-6 for bar entry; the bear-off overshoot rule needs a checker
+  actually farther from home to correctly forbid the shortcut, tested
+  in both directions (mirrored for X and O, since their home ranges
+  and pip-distance formulas are opposite). Committed `dab5c0f`.
+- `main.py` — compact two-row terminal board (points 13-24 top,
+  12-1 bottom, so home quadrants align vertically like a physical
+  board), bar/off counts, numbered per-die action menu via
+  `shared.input.prompt_choice`. Verified end-to-end differently than
+  tictactoe/connect4: dice make an exact scripted win-path
+  impractical, so piped 3000 lines of "always pick option 1" into a
+  real run instead — completed cleanly (exit 0, no tracebacks, full
+  game to "O wins!"), confirming rendering + input flow + board logic
+  work together across a full real game. Committed `f6bc257`.
+- `BUILD.lirk` — same `board`/`board_test`/`main` shape as
+  tictactoe/connect4. Sanity-checked (`lirk build` on `:board` and
+  `:main`, one `lirk test` pass) before committing. Committed
+  `538c96b`.
+- `README.md` (backgammon + updated `board-games/README.md`) —
+  documents the deliberate no-doubling-cube scope decision. Committed
+  `e1aa645`.
+
+**Test rigor:** `lirk test //board-games/backgammon:board_test` —
+**10/10** fresh-subshell runs, `.lirk-cache.json` deleted before each
+to force genuine re-execution, same methodology as every prior
+target. `lirk build //...`: all 13 targets across `shared/`,
+`tictactoe/`, `connect4/`, and `backgammon/` build clean — full graph
+still resolves correctly with the new cross-package deps
+(`//shared:term`, `//shared:input`) added.
+
+## Priority list status (2026-07-27, updated)
+
+1. `shared/` — **done**.
+2. `board-games` — **in progress**: `tictactoe`, `connect4`,
+   `backgammon` done; `go`, `chess` still to come, same pattern.
+3. `adventure-engine` — not started.
+4. `weather-narrative`, `world-events-tracker` — bonus, still last.
+
+## Next up
+
+- `board-games/go` (or `chess`), same pattern: pure logic module +
+  test, thin `main.py` entrypoint, `BUILD.lirk`, `lirk test`
+  confirmed via multiple fresh-shell runs, commit per file per this
+  session's instruction.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
