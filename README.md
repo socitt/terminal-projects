@@ -42,12 +42,13 @@ inline in that part of the repo.
 
 - `shared/` — common terminal rendering and single-keypress input
   helpers used across tools.
-- `weather-narrative/` — turns weather data into narrative text.
 - `board-games/` — terminal board games (tictactoe, connect4,
   backgammon, go, chess).
 - `adventure-engine/` — text adventure engine, with individual stories
   under `adventure-engine/stories/` (dungeon, train-mystery).
-- `world-events-tracker/` — world events tracking tool.
+- `region-explorer/` — WA state ASCII zoom map.
+- `clanhold/` — cat-clan colony sim (working title), builds on
+  `region-explorer`.
 - `docs/ACTIVE_SESSION.md` — running session log, used to resume work
   after a crash. If you're picking up an interrupted session, read this
   first.

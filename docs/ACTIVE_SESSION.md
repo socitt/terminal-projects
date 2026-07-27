@@ -964,16 +964,122 @@ cache-cleared batches. No lirk bugs found this session.
    `train-mystery`), each with real branching content, ASCII art
    tested at the narrow-terminal width, BFS-verified scene/ending
    reachability, and subprocess-based integration tests.
-4. `weather-narrative`, `world-events-tracker` — bonus, still last, in
-   that order (per the original reordering). Neither started; no
-   design decisions made yet for either.
+4. `region-explorer`, `clanhold` — not started, in that order.
 
-## Next up
+## Priority change from user (2026-07-27)
 
-- `weather-narrative` (or `world-events-tracker`, order TBD — both are
-  bonus/stretch per the standing priority list) — start fresh with a
-  scope discussion before writing code, same as every prior project.
-  No existing design decisions to build on for either.
+`weather-narrative` and `world-events-tracker` are **removed from the
+priority list entirely** — not deferred/bonus, just gone. Neither had
+any stub folder, code, or BUILD file on disk (confirmed via search
+before this change), so there was nothing to delete beyond the
+references to them in this file and root `README.md` (both updated).
+
+Replacing them with two new projects, in this order:
+1. `region-explorer` — WA state ASCII zoom map.
+2. `clanhold` (working title) — cat-clan colony sim, builds on
+   `region-explorer`.
+
+Neither has design decisions made yet — start fresh with a scope
+discussion before writing code, same as every prior project.
+
+## In progress (2026-07-27, new session): `region-explorer` + `clanhold` design, no code yet
+
+Design-only session, no implementation started — everything below was
+proposed and signed off on in conversation before any code was
+written, per the "propose before building" pattern used for every
+prior project.
+
+**`region-explorer` design (signed off):**
+- Sub-region division: 6 named, landmark-based regions rather than a
+  grid overlay (Olympic Peninsula, Puget Sound, North Cascades, South
+  Cascades, Columbia Basin, Inland Northwest) — chosen because WA's
+  identity is already regional, a grid would mean nothing
+  geographically.
+- Data shape: one `STATE` dict per state module (`data/washington.py`),
+  `{"name", "art" (char-grid), "regions": [{"id", "name", "center",
+  "detail_art", "landmarks"}]}` — engine only ever depends on this
+  shape, never references "Washington" by name, so future states are
+  just new data files.
+- Zoom mechanism: procedural, not per-region-authored — `crop_window`
+  (shrinking, edge-clamped window centered on `region["center"]`),
+  `scale_nn` (nearest-neighbor scale to a fixed display size), chained
+  into `zoom_frames` ending on the hand-authored `detail_art` as the
+  crisp final frame. All three pure/testable independent of terminal
+  output.
+- Known constraint: "skippable" zoom can't mean interrupting a playing
+  animation, since `shared/input.py`'s model is line-buffered
+  (`input()`, no raw non-blocking read) — will be an upfront
+  play-animation y/n prompt instead.
+- `region-explorer/SYMBOL_LEGEND.md` written: a shared, state-agnostic
+  ASCII vocabulary (not WA-specific) so future states' data reuses the
+  same symbol meanings. Deliberately not using any external ASCII-art
+  symbol pack — repo's ask-before-dependency rule, plus the explicit
+  requirement that the art be original, not modeled on any specific
+  existing game's tile conventions.
+- Full-state overview art and all 6 regions' `detail_art` drafted and
+  style-tested (verified column widths programmatically, ~28-39 cols,
+  within the ~30-40 col target) — two deliberately different visual
+  registers: clean/abstract for the overview, dense/chunky/organic for
+  zoomed detail views, per the spec. Two symbols added to the legend
+  during drafting: `*` (snowcap, works on both Mt. Baker's plain peak
+  and Mt. Rainier's/Mt. St. Helens' differently-shaped silhouettes —
+  St. Helens drawn with a flat blown-top crater instead of a peak) and
+  `:` (irrigated cropland, Yakima Valley — a wetter variant of `,`'s
+  dry-farmed Palouse hills).
+- User signed off on the art direction. **Not yet done:** actual
+  directory/file structure (`data/washington.py`, `engine.py`,
+  `engine_test.py`, `runner.py`, `main.py`, `BUILD.lirk`) — none of
+  this exists on disk yet, only the design and `SYMBOL_LEGEND.md`.
+
+**`clanhold` design (signed off, no code — depends on `region-explorer`
+existing first):**
+- V1 cut agreed: full starting flow (region-explorer zoom + spot
+  selection, clan naming, 3-4 starting cats with 2-3 traits each),
+  minimal camp + 1-2 unlockable structures (no building tree), leader +
+  healer roles only, full fog-of-war/territory-via-patrol, **one**
+  neighboring clan with a simple drifting disposition (not multi-clan
+  diplomacy), hunting/water/food/simple rotating weather, ambient minor
+  wildlife + larger mammals folded into the hunting/patrol risk table
+  (not a separate ecosystem sim), a small curated event table + simple
+  periodic kit-birth chance (not genetics or a general event
+  framework).
+- Explicitly deferred to v2+: multiple clans/real diplomacy, a
+  standalone wildlife ecosystem, a general-purpose event-authoring
+  framework, extra roles/structures beyond the v1 set.
+- Data model agreed: territory modeled as a small named zone graph per
+  region (~6-10 zones, terrain type + adjacency + explored/controlled
+  status) rather than an x/y coordinate grid — matches the repo's
+  existing narrative/scene-graph pattern (adventure-engine) better than
+  inventing 2D geometry, and ties directly into region-explorer's
+  region id (clanhold owns its own per-region zone graph as gameplay
+  data layered on top of region-explorer's generic/visual-only region
+  data — region-explorer itself stays state-agnostic and
+  gameplay-agnostic).
+- Single JSON-serializable `game_state` dict agreed (clan info, `cats`
+  list with traits/role/status, `camp.structures`, `zones`,
+  `other_clans`, `weather`, `event_log`), save/resume via the same
+  `save_state`/`load_state`-to-a-path convention as
+  `adventure-engine/engine.py`.
+- Module split agreed: `cats.py`, `camp.py`, `territory.py`,
+  `hunting.py`, `clans.py`, `weather.py`, `events.py`, `population.py`,
+  each independently unit-testable, composed by one orchestrating
+  `game.py` — the key seam is `advance_day(state, actions, rng)`, pure
+  and taking an injectable `rng` (same pattern as
+  `backgammon.roll_dice(rng)`) so every hunt/event/birth roll is
+  deterministically testable.
+- Neither lineage this draws on (named only in this file/commit
+  messages, never user-facing) should appear anywhere in README intro
+  text, in-game text, or naming conventions — all names (clans, roles,
+  buildings) must be original.
+
+Session ended here (user had to go) — everything above is design only,
+committed as docs/legend, not code. **Next up is real
+`region-explorer` implementation**, starting with `data/washington.py`
++ the full-state/6 detail arts already drafted above, then
+`engine.py`/`engine_test.py` for the pure crop/scale/zoom-frame logic,
+same discipline as every prior project (small increments, commit per
+file, `lirk test` multi-run rigor, dogfooding log continued in
+`../lirk/docs/dogfooding/2026-07-27-region-explorer.md`).
 
 ## Open questions
 
