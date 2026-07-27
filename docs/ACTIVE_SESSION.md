@@ -642,6 +642,68 @@ interactively via `python3` against the real `board.py` first (same
 discipline as go's snapback/ko fixtures), before encoding them into
 `board_test.py`.
 
+## In progress (2026-07-27, new session): resuming chess, lirk pulled post-review
+
+New session start. Per explicit instruction: pulled `../lirk` first —
+confirmed at `9611760` ("Close out the review-driven work in the
+session log"), post architecture-review with 18 follow-up hardening
+commits since the `428c517` this repo last used (unknown-key
+rejection, no-srcs rejection, run-all-srcs-not-just-first-failure,
+stdin=DEVNULL + timeout for test subprocesses, atomic incremental
+cache saves, dot-directory skipping, label-syntax validation, and
+more — full list in `../lirk/docs/dogfooding/2026-07-27-chess.md`).
+
+Regression-checked the *existing* graph against the updated lirk
+before touching chess further: `lirk build //...` — 20/20 targets
+clean. `lirk test //...` — 10/10 tests passed, 3x fresh-shell with
+`.lirk-cache.json` cleared each run. No regressions from the 18 fixes.
+
+Found chess exactly where the prior session left it: `board.py`
+committed (`839165e`), `board_test.py` (55 tests, covering check,
+checkmate, stalemate, castling both sides + through/onto-check +
+rights-invalidation, en passant, promotion) written but **uncommitted**
+— matching the log's last note that verification was still pending.
+
+Ran `board_test.py` standalone first (repo convention): **55/55
+green.** Then, since the log flagged chess's bug-prone areas
+explicitly (castling-through-check, en passant, promotion), did a
+mutation-testing spot check on `board.py` before trusting the suite,
+same discipline used for go/backgammon's coverage review — backed up
+`board.py`, broke 4 real rules one at a time, confirmed each caused a
+real test failure, reverted (diffed clean after each revert):
+
+- Disabled en passant capture eligibility → 2 tests failed
+  (`EnPassantTest`).
+- Disabled the castling-through-check transit-square safety check →
+  1 test failed (`test_castling_forbidden_through_attacked_square`).
+  Notably, the *landing*-square variant (`..._onto_attacked_square`)
+  did **not** fail under this same mutation — it's independently
+  protected by `legal_moves`'s generic own-king-safety filter (landing
+  in check is illegal for any move, not just castling), so the
+  dedicated landing-square check in `_king_moves` is defense-in-depth,
+  not the only guard. Confirmed this is by design, not a gap: a second
+  mutation disabling the general king-safety filter entirely (see
+  below) does catch the landing-square case too.
+- Disabled the general own-king-safety filter in `legal_moves` (the
+  "generate then filter" check shared with go's suicide-rule shape) →
+  3 tests failed, including the pin-detection test and both the fools-
+  mate checkmate test and the K+Q-vs-K stalemate test.
+- Removed the mandatory-promotion-choice enforcement in `apply_move` →
+  2 tests failed (`test_raises_without_promotion_choice`,
+  `test_raises_on_invalid_promotion_choice`).
+
+All 4 caught, `board.py` confirmed byte-identical to committed version
+after all reverts. `board_test.py` committed.
+
+Also started `../lirk/docs/dogfooding/2026-07-27-chess.md` (uncommitted
+in the lirk repo, per the standing hand-off convention) — logging real
+lirk usage experience as chess proceeds, separate from this file.
+
+## Next up
+
+- `main.py` (algebraic-notation input, promotion prompt), `main_test.py`,
+  `BUILD.lirk`, `README.md` — same per-file commit+push discipline.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
