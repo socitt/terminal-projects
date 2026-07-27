@@ -514,24 +514,87 @@ fresh-subshell runs, `.lirk-cache.json` deleted before each. `lirk
 build //...`: all 16 targets across `shared/`, `tictactoe/`,
 `connect4/`, `backgammon/`, and `go/` build clean.
 
+## Test-coverage review (2026-07-27): closed the main.py gap, spot-checked test quality
+
+User asked whether test coverage was actually adequate, and pushed on
+a real question: if tests pass every time, does that mean they're
+good tests? Answer acted on: no, passing is necessary but not
+sufficient — a test only means something if it's *capable* of
+failing. Two things followed from that.
+
+**1. Closed the biggest real gap: `main.py` had zero automated tests
+in any of the four games.** All prior "manually verified end-to-end"
+claims in this log were piped-input runs in the terminal, real but
+not repeatable or checked by `lirk test`. Added `main_test.py` to
+each game (subprocess-based: runs the real `main.py` with piped
+stdin, same as a player typing), wired into `BUILD.lirk` as a new
+`main_test` target (`deps = [":main"]`) per game:
+
+- `tictactoe`: scripted win (top row) + full-board draw.
+- `connect4`: scripted horizontal win + a full-column-rejected-then-
+  continues-to-win scenario (exercises the `except ValueError:
+  continue` retry path nothing else tested).
+- `go`: the two scenarios already manually verified while building
+  `main.py` (illegal-move-then-pass-pass with correct scoring; a real
+  sequential corner capture), now committed and repeatable.
+- `backgammon`: dice make an exact scripted outcome impractical, so
+  this one only asserts a full game (always picking the first offered
+  action) reaches a winner cleanly — guaranteed to terminate since
+  every action strictly decreases total pips. Verified reliable
+  across 16+ runs with genuinely different random dice each time
+  (~2-4s standalone, ~9-12s through `lirk test`'s nested-subprocess
+  overhead — noted so a future session doesn't mistake that for a
+  hang, which is what it looked like on first glance during a
+  combined multi-target batch that hit a Bash-tool timeout).
+
+All committed and pushed per-file (test file, then `BUILD.lirk` edit,
+per game — 8 commits). `lirk build //...`: 20 targets total, all
+clean. Root `board-games/README.md`/per-game `README.md`s not updated
+for this — the games' scope descriptions didn't change, only their
+test coverage did.
+
+**2. Mutation-testing spot check, to answer "are these tests actually
+good" rather than just "do they pass."** Deliberately broke 4 real
+rules in `go/board.py` and `backgammon/board.py`, one at a time, ran
+the relevant `board_test.py`, confirmed a failure, reverted (backed up
+originals first, diffed clean after each revert):
+
+- go: disabled the ko check entirely (`if False and ...`) → 1 test
+  failed (`test_ko_forbids_immediate_recapture`).
+- go: disabled captures entirely → 7 tests failed/errored (captures
+  are load-bearing for several other assertions too, e.g. the
+  snapback test).
+- backgammon: disabled the bear-off overshoot's farther-checker check
+  → 3 tests failed.
+- backgammon: weakened the blocking rule (`>= 2` → `> 2`, wrongly
+  allowing a landing on a made 2-stack point) → 7 tests failed.
+
+All 4 caught. This doesn't prove the suites are exhaustive, but it's
+real evidence they're not tautological — they die when the rules
+they claim to check actually break, which is the honest bar for "are
+these good tests," not just green-every-time.
+
 ## Priority list status (2026-07-27, updated)
 
 1. `shared/` — **done**.
 2. `board-games` — **in progress**: `tictactoe`, `connect4`,
-   `backgammon`, `go` done; `chess` still to come, same pattern.
+   `backgammon`, `go` done (now with `main.py` integration tests
+   too); `chess` still to come, same pattern.
 3. `adventure-engine` — not started.
 4. `weather-narrative`, `world-events-tracker` — bonus, still last.
 
 ## Next up
 
 - `board-games/chess` — last `board-games` entry, same pattern: pure
-  logic module + test, thin `main.py` entrypoint, `BUILD.lirk`,
-  `lirk test` confirmed via multiple fresh-shell runs, commit per
-  file per this session's instruction. Chess has its own bug-prone
-  areas worth verifying interactively before writing tests the same
-  way go's snapback/ko fixtures were: check/checkmate/stalemate
-  detection, castling (both sides, through-check and rook-moved/king-
-  moved invalidation), en passant, and pawn promotion.
+  logic module + test, thin `main.py` entrypoint, `main_test.py`
+  (established this session as standard going forward, not just a
+  one-off backfill), `BUILD.lirk`, `lirk test` confirmed via multiple
+  fresh-shell runs, commit per file per this session's instruction.
+  Chess has its own bug-prone areas worth verifying interactively
+  before writing tests the same way go's snapback/ko fixtures were:
+  check/checkmate/stalemate detection, castling (both sides, through-
+  check and rook-moved/king-moved invalidation), en passant, and pawn
+  promotion.
 
 ## Open questions
 
