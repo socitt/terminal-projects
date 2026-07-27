@@ -596,6 +596,52 @@ these good tests," not just green-every-time.
   check and rook-moved/king-moved invalidation), en passant, and pawn
   promotion.
 
+## In progress (2026-07-27, new session): `board-games/chess`
+
+Fresh session start: confirmed via `git log`/`git status` that the repo
+is exactly where the prior session left it (nothing to resume beyond
+an unrelated uncommitted `.claude/settings.local.json` tweak, not
+touched). Skimmed this file for context per session start instruction.
+
+Starting `chess`, same `board.py` → `board_test.py` → `main.py` →
+`main_test.py` → `BUILD.lirk` pattern as the other four games, per
+explicit per-file commit+push discipline established with backgammon.
+
+Design decisions made before writing code:
+- Board: `board[row][col]`, row 0 = rank 1 (white's back rank), row 7
+  = rank 8; col 0 = file a, col 7 = file h. Pieces are single letters,
+  uppercase = white, lowercase = black (`P N B R Q K` / `p n b r q k`),
+  `""` = empty — standard, compact, and matches the single-letter
+  notation needed for the ~30-40 col terminal constraint.
+- Game state is a dict: `board`, `turn`, `castling` (4 independent
+  booleans `K`/`Q`/`k`/`q`), `en_passant` (target square or `None`,
+  reset every move except immediately after a two-square pawn push).
+- Move legality: pseudo-legal generation per piece, then filtered by
+  simulating the move and checking the mover's own king isn't left in
+  check — same "generate then filter by safety" shape as go's
+  suicide-rule check, not a from-scratch pin-detection algorithm.
+- Castling encoded as a two-square king move in pseudo-legal
+  generation (checks rights, empty-between, not-currently-in-check,
+  and king's path/landing squares not attacked); `apply_move` detects
+  the two-square king move and relocates the rook. Castling rights
+  invalidated on king move, rook move from its original square, or
+  rook captured on its original square.
+- En passant: diagonal pawn move onto the (empty) `en_passant` target
+  square triggers removal of the passed pawn.
+- Promotion: `apply_move` takes an explicit `promotion` param
+  (`Q`/`R`/`B`/`N`); raises if a pawn reaches the last rank without one
+  supplied, forcing `main.py` to prompt rather than silently defaulting
+  to queen.
+- Input scheme for `main.py`: file letter (a-h) + rank digit (1-8) per
+  square, unlike go's plain column/row digits — algebraic notation is
+  the natural fit for chess and still single-key+Enter compatible via
+  `shared/input.py`'s `prompt_choice`.
+
+Plan: verify castling-through-check, en passant, and promotion
+interactively via `python3` against the real `board.py` first (same
+discipline as go's snapback/ko fixtures), before encoding them into
+`board_test.py`.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
