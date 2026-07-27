@@ -861,15 +861,52 @@ games' rule-validation shape.
   surfaced). `lirk build //...`: 28/28 targets clean. Committed
   `ca5bec9`.
 
+## Done (2026-07-27): `adventure-engine/stories/dungeon`
+
+- Style-tested ASCII art at the narrow-terminal constraint before
+  committing to real content: drafted candidate scenes in a scratch
+  script, confirmed simple line-art (basic ASCII chars, no box-drawing
+  unicode) fits comfortably at <=36 cols, then finalized 9 scene arts.
+- `story.py` — 9 scenes, 3 endings (`escape_with_treasure`,
+  `escape_plain`, `caught_again` [bad]). Exercises both
+  `requires_items` (a rusty key gates the corridor door) and
+  `requires_flags` (a self-looping "study the guard" choice in
+  `corridor` sets `studied_guard`, which gates `vault_entrance`'s
+  sneak option) — not just linear branching. Verified programmatically
+  before committing: wrote a BFS over all reachable
+  `(scene, inventory, flags)` states and confirmed all 9 scenes and
+  all 3 endings are actually reachable, rather than trusting the
+  hand-drawn scene map in the module docstring. Committed `d6acaee`.
+- `main.py` — thin wrapper supplying the story module + a per-story
+  save path to `runner.run()`. Manually verified end-to-end via piped
+  playthroughs to all 3 endings and a save/resume cycle. Committed
+  `ebb4691`.
+- `main_test.py` — 5 subprocess-based integration tests (real story
+  content, not a fixture): treasure-escape, plain-escape,
+  shout-leads-to-bad-ending, vault-sneak-hidden-until-guard-studied,
+  and a save/resume cycle across two separate process runs. One
+  scenario's scripted input was wrong on the first attempt (assumed
+  "Turn back" stayed at its raw choice-list position 2 at
+  `vault_entrance`, but it renumbers to 1 once "Slip past" is gated
+  out) — caught by the live hand-verification pass *before* encoding
+  it, not after, same discipline as the engine/runner mutation-testing
+  catches above. Committed `22af841`.
+- `BUILD.lirk` — `story`/`main`/`main_test`, first cross-package deps
+  for `adventure-engine` (`//adventure-engine:runner` consumed from a
+  story pack). `lirk test
+  //adventure-engine/stories/dungeon:main_test`: **10/10** fresh-shell,
+  cache-cleared runs. Committed `df918b2`.
+
+`lirk build //...`: **31/31** targets clean.
+
 ## Next up
 
-- `stories/dungeon` — dungeon crawler using the engine above: `story.py`
-  (scenes/choices as data, ASCII art per scene — test rendering at
-  ~30-40 cols before committing to a style), thin `main.py` (imports
-  `runner.run`), `main_test.py` (subprocess, real story content this
-  time, not a fixture), `BUILD.lirk`. Then `stories/train-mystery`,
-  same shape. No design decisions made yet for either story's actual
-  content/branching map.
+- `stories/train-mystery` — whodunit on a train, same shape as
+  dungeon: style-test ASCII art first, design + BFS-verify the scene/
+  clue graph before writing final content, `story.py` -> `main.py` ->
+  `main_test.py` -> `BUILD.lirk`, same per-file commit discipline. No
+  design decisions made yet for its actual content/branching map
+  (suspects, clues, accusation logic).
 
 ## Open questions
 
