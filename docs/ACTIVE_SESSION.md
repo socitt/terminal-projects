@@ -262,9 +262,33 @@ throughout this whole saga; only the tooling running them changed.
 
 **`shared/` via `lirk` is the reference pattern going forward**: stub →
 `BUILD.lirk` → `lirk test` confirmed via multiple fresh-shell runs →
-commit. Applying it next to `shared/input.py` (already written,
-same "unconfirmed" state term.py was in), then moving to `board-games`
-per the priority order below.
+commit.
+
+**Correction:** the plan above assumed `shared/input.py` was already
+written and just unconfirmed, same as `term.py` had been. Checked
+before acting on that — it wasn't; only planned in a "Next up" note,
+never actually created. Wrote it from scratch instead (see below)
+rather than silently treating a plan as done code.
+
+## Done (2026-07-27): `shared/input.py` — single-key input helper
+
+New module, following the `term.py`/`lirk` pattern directly (no Please
+BUILD entry — `shared/` is standardizing on `lirk` per the note
+above): `normalize_key` (pure), `get_key`/`prompt_choice` (thin
+wrappers around `input()`, tested via mocking `builtins.input`). Design
+follows the original project constraint noted in this file's
+Environment section — iOS on-screen keyboard only, so no raw
+single-char reads or arrow/modifier-key chords; "single-key" here
+means "type one character, hit Enter."
+
+`shared/BUILD.lirk` extended with `input`/`input_test` targets.
+`lirk test //shared:input_test`: **10/10** fresh-shell runs,
+`.lirk-cache.json` cleared each time, all 8 tests passing every run.
+Committed and pushed (`e714c45`).
+
+`shared/` is now fully green under `lirk`: `term_test` and
+`input_test` both confirmed reliably passing. Moving to `board-games`
+next, starting with `tictactoe`, same pattern.
 
 ## Open questions
 
