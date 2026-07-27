@@ -768,6 +768,109 @@ not something to act on further from this side.
   discussion the same way chess's castling/en passant/promotion scope
   was decided up front before writing code.
 
+## In progress (2026-07-27, new session): starting `adventure-engine`
+
+Fresh session start: confirmed via `git log`/`git status` that the repo
+is exactly where the prior session left it (board-games fully done,
+nothing to resume beyond the unrelated uncommitted
+`.claude/settings.local.json` tweak, not touched). Pulled `../lirk`
+(already up to date, nothing new since the chess session's `9611760`).
+
+Noticed a stray untracked, empty `board-games/lirk/docs/` directory on
+disk (not git-tracked, doesn't show in `git status` since it's empty) —
+looks like debris from an earlier accidental invocation. Left alone,
+not part of any tracked state.
+
+Design decisions made before writing code (per explicit instruction to
+propose the state model first, same as chess's up-front castling/en
+passant/promotion decisions):
+
+- State (save/resume-able): `{"scene": id, "inventory": [...],
+  "flags": {...}, "visited": [...]}`. `inventory` is an order-
+  preserving list, `flags` arbitrary story-defined booleans, `visited`
+  an ordered scene-id history.
+- Story data is a plain Python module per pack (e.g.
+  `stories/dungeon/story.py`, `START` + `SCENES` dict), not JSON —
+  keeps ASCII art as readable triple-quoted strings, stays consistent
+  with the rest of the repo being pure Python, and still slots into
+  `lirk` as an ordinary `python_library` target, same shape as
+  `board.py`. No engine imports inside story data — genuinely just
+  data, per the "engine runs either pack without code changes" scope
+  requirement.
+- A scene's `choices` list entries carry `requires_flags`,
+  `requires_items`, `sets_flags`, `add_items`, `remove_items`. A scene
+  with no *available* choices (empty, or all gated out) is an ending —
+  no separate ending flag needed.
+- `engine.py` is pure logic, no I/O, mirroring `board.py`'s
+  testability shape: `new_state`, `available_choices`, `apply_choice`,
+  `is_ending`, `save_state`/`load_state` (plain JSON, since state is
+  already JSON-serializable).
+
+Plan: `engine.py` + `engine_test.py` (fixture story, not real prose)
+first, committed and confirmed via `lirk` before any story content.
+Then `BUILD.lirk` for the engine, then `stories/dungeon`, then
+`stories/train-mystery`, per-file commits per the established
+discipline. Also starting
+`../lirk/docs/dogfooding/2026-07-27-adventure-engine.md` (uncommitted
+there, per the standing hand-off convention) to note whether lirk
+handles this data-driven-content shape any differently than the board
+games' rule-validation shape.
+
+## Done (2026-07-27): `adventure-engine` core (`engine.py`, `runner.py`)
+
+- `engine.py` — pure state machine per the design above: `new_state`,
+  `available_choices` (flag/item gating), `apply_choice` (effects:
+  `sets_flags`/`add_items`/`remove_items`, dedup on add, raises
+  `IndexError` on an out-of-range index — index is relative to
+  *available* choices, not the scene's raw choice list, so a gated-out
+  choice can never be selected by stale positional index),
+  `is_ending` (no available choices), `save_state`/`load_state` (plain
+  JSON, state is already JSON-serializable). Committed `edfa874`.
+- `engine_test.py` — 24 tests against a small fixture story (not real
+  prose). Ran standalone first (24/24 green), then mutation-tested 4
+  real rules (flag gating, item gating, add-item dedup, index-bounds
+  check) one at a time — all 4 caught on the first pass, `engine.py`
+  confirmed byte-identical after each revert. Committed `ff99f7b`.
+- `runner.py` — the shared interactive loop every story pack's own
+  thin `main.py` calls (`run(story, save_path)`): renders art+text via
+  `shared.term`, numbered-choice prompts via `shared.input`, "s" to
+  save-and-quit, resume-or-decline prompt when a save file exists.
+  Committed `56dc0e6`.
+- `runner_test.py` — 4 subprocess-based tests (same style as every
+  board game's `main_test.py`) against a tiny fixture story: full
+  playthrough to an ending, save-and-quit, resume-and-continue,
+  decline-resume-starts-fresh. Mutation testing caught 2 of 3 breaks
+  immediately (skipped save-file removal on ending; skipped the actual
+  `save_state` call on quit) but the third — silently ignoring the
+  resume y/n answer and always resuming — **slipped through** the
+  original decline-resume test, because both a forced-resume and a
+  genuine fresh start happened to reach "THE END" given the same input
+  length; the test only checked for a successful ending, not which
+  path was taken. Fixed by asserting the start scene's text actually
+  renders (proof play began at `story.START`), reran the mutation,
+  confirmed it's now caught. Worth remembering for any other
+  session/choice-count-based test: passing doesn't mean the *specific*
+  path claimed was actually taken — assert on distinguishing content,
+  not just a shared downstream outcome. Committed `2571b37`.
+- `BUILD.lirk` — `engine`/`engine_test`/`runner`/`runner_test`
+  targets. `lirk test //adventure-engine:engine_test` and
+  `:runner_test`: **10/10** fresh-shell, cache-cleared runs each
+  (`runner_test` needed a longer-than-default Bash timeout — each
+  `lirk test` invocation is ~10-12s due to its own nested-subprocess
+  model, same overhead shape backgammon's `main_test` already
+  surfaced). `lirk build //...`: 28/28 targets clean. Committed
+  `ca5bec9`.
+
+## Next up
+
+- `stories/dungeon` — dungeon crawler using the engine above: `story.py`
+  (scenes/choices as data, ASCII art per scene — test rendering at
+  ~30-40 cols before committing to a style), thin `main.py` (imports
+  `runner.run`), `main_test.py` (subprocess, real story content this
+  time, not a fixture), `BUILD.lirk`. Then `stories/train-mystery`,
+  same shape. No design decisions made yet for either story's actual
+  content/branching map.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
