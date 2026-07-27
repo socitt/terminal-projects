@@ -322,20 +322,44 @@ resolution works, not just single-package targets.
 `lirk test //board-games/tictactoe:board_test`: **10/10** fresh-shell,
 cache-cleared runs. Committed and pushed (`9e2bc95`).
 
+## Done (2026-07-27): `board-games/connect4`
+
+Same pattern as `tictactoe`: `board.py` (pure logic on a 6-row x
+7-column grid — `new_board`, `valid_moves`, `apply_move` with gravity,
+`winner` checking all 4 directions, `is_draw`), `board_test.py` (19
+tests), `main.py` (entrypoint, manually verified end-to-end with a
+piped-input playthrough to a horizontal win), `BUILD.lirk` (same
+`board`/`board_test`/`main` shape, `main` depending on `//shared:term`
+and `//shared:input`).
+
+Caught a bug in my own `is_draw`-with-a-winner test during
+development, not a `board.py` bug: filling the board with all `"O"`
+before adding the `"X"` win line created spurious full-row `"O"` runs
+that `winner()`'s row-major scan finds first, so the test asserted the
+wrong mark. Fixed by not asserting *which* mark wins in that specific
+test (already covered by the dedicated `WinnerTest` cases) — only that
+`is_draw` is `False`. First 10-run batch: 0/10, all failing on that
+one assertion; after the fix, re-ran clean.
+
+`lirk build //...`: all 10 targets across `shared/`, `tictactoe/`, and
+`connect4/` build clean. `lirk test //board-games/connect4:board_test`:
+**10/10** fresh-shell, cache-cleared runs (after the test fix above).
+Committed and pushed (`3cec08c`).
+
 ## Priority list status (2026-07-27)
 
 Per the reordered list further down this file:
 
 1. `shared/` — **done**, both `term`/`input` green under `lirk`.
-2. `board-games` — **in progress**: `tictactoe` done; `connect4`,
+2. `board-games` — **in progress**: `tictactoe`, `connect4` done;
    `backgammon`, `go`, `chess` still to come, same pattern.
 3. `adventure-engine` — not started.
 4. `weather-narrative`, `world-events-tracker` — bonus, still last.
 
 ## Next up
 
-- `board-games/connect4` (or whichever board-games entry is picked up
-  next), same pattern: pure logic module + test, thin `main.py`
+- `board-games/backgammon` (or whichever board-games entry is picked
+  up next), same pattern: pure logic module + test, thin `main.py`
   entrypoint, `BUILD.lirk`, `lirk test` confirmed via multiple
   fresh-shell runs, commit.
 
