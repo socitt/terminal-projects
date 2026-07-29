@@ -1,0 +1,10 @@
+[[target]]
+name = "engine"
+type = "library"
+srcs = ["engine.py"]
+
+[[target]]
+name = "engine_test"
+type = "test"
+srcs = ["engine_test.py"]
+deps = [":engine"]
