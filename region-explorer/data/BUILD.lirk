@@ -1,0 +1,10 @@
+[[target]]
+name = "washington"
+type = "library"
+srcs = ["washington.py"]
+
+[[target]]
+name = "washington_test"
+type = "test"
+srcs = ["washington_test.py"]
+deps = [":washington", "//region-explorer:engine"]
