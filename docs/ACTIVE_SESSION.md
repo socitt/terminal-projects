@@ -1081,6 +1081,94 @@ same discipline as every prior project (small increments, commit per
 file, `lirk test` multi-run rigor, dogfooding log continued in
 `../lirk/docs/dogfooding/2026-07-27-region-explorer.md`).
 
+## Done (2026-07-29): `region-explorer` implementation complete
+
+Picked up exactly where the design-only session left off: the STATE
+shape, symbol legend, and 6-region plan were already signed off, but
+no code existed on disk yet (the previously "drafted and style-tested"
+art was never committed, only described). Redrafted it this session,
+verifying widths programmatically rather than trusting hand-typed
+spacing (caught and fixed one real bug this way: `\` escape sequences
+collapsing string length by 1 relative to hand-counted padding — fixed
+by adding a `_pad_grid` helper in `data/washington.py` that pads to
+each block's own max row length instead of trusting manual spacing).
+
+- `engine.py` — `crop_window` (edge-clamped), `scale_nn`
+  (nearest-neighbor), `zoom_frames` (chains both, ends on the region's
+  `detail_art`), `region_by_id`. `engine_test.py` — 19 tests,
+  mutation-verified (2/2 injected bugs caught: disabled clamping,
+  broken scale formula).
+- `data/washington.py` — full-state overview (36x15) plus 6 regions'
+  `detail_art` (Olympic Peninsula, Puget Sound, North Cascades, South
+  Cascades, Columbia Basin, Inland Northwest), drawing from
+  `SYMBOL_LEGEND.md`'s vocabulary; two visual registers (clean/abstract
+  overview vs. dense/organic detail) per the signed-off design.
+  `data/washington_test.py` — 8 data-integrity tests (grid widths,
+  region centers in-bounds, unique ids, etc).
+- `runner.py` — overview → pick region → animate y/n → zoom loop.
+  `run()` takes an injectable `sleep_fn` (same shape as
+  `backgammon.roll_dice(rng)`) specifically so tests can assert the
+  animation path was taken by call count instead of racing wall-clock
+  time against subprocess overhead — the first version used a
+  wall-clock timing assertion and it was genuinely flaky (9/10 in one
+  batch) under this environment's nested-subprocess overhead; rewritten
+  around the injectable before considering it done, not just re-run
+  until it passed. `runner_test.py` — 5 tests, mutation-verified (2/2
+  caught: animate flag ignored, loop exits after one region instead of
+  returning to overview).
+- `main.py` — thin wrapper. Manually verified end-to-end via piped
+  playthroughs (both animated and non-animated paths), output eyeballed
+  for correctness — the animation visibly narrows toward the selected
+  region before landing on its detail art. `main_test.py` — 3 tests
+  against the real Washington data (all 6 regions reachable in one run).
+- `BUILD.lirk` in both `region-explorer/` and `region-explorer/data/`
+  (cross-package deps, same pattern as `adventure-engine`/`stories/*`).
+  `README.md` added.
+
+**Full-repo confirmation:** `lirk build //...` — 42/42 targets clean.
+`lirk test //...` — 20/20 tests pass. Every new test target individually
+confirmed 10/10 across fresh-shell, cache-cleared `lirk test` runs
+(engine, data, runner) or standalone (main, given main_test's own
+subprocess overhead already stacks with lirk's).
+
+## Priority list status (2026-07-29, updated)
+
+1. `shared/` — **done**.
+2. `board-games` — **done**.
+3. `adventure-engine` — **done**.
+4. `region-explorer` — **done**: overview + all 6 regions, zoom
+   animation, mutation-verified engine/runner logic.
+5. `clanhold` — not started; design was signed off in the same
+   session `region-explorer`'s design was (see above), depends on
+   `region-explorer` existing, which it now does.
+
+## Also outstanding (not part of the numbered build-order list)
+
+`docs/USER_TESTING.md` (2026-07-27 playtest pass) logged a
+cross-cutting feature request not yet started: a computer opponent
+("Nemo") for all 5 board games, 3 difficulty levels, with a "Nemo cam"
+reactive-avatar stretch goal. Also smaller unaddressed items there:
+connect4's out-of-range column-input bug, missing rematch prompts
+(tictactoe/connect4/dungeon), self-loop choice UX gap in both
+adventure-engine stories, and requested storyboarding sessions for
+extending both stories' decision trees. None of these blocked this
+session's `region-explorer` work and weren't picked up here — noting
+them so a future session doesn't have to rediscover them by re-reading
+`docs/USER_TESTING.md` in full.
+
+## Next up
+
+- `clanhold` — next per the priority list above, and its design is
+  already signed off (see the 2026-07-27 entry above): V1 scope, data
+  model (zone graph per `region-explorer` region, single JSON-
+  serializable `game_state`), module split
+  (`cats.py`/`camp.py`/`territory.py`/`hunting.py`/`clans.py`/
+  `weather.py`/`events.py`/`population.py` composed by `game.py`, with
+  `advance_day(state, actions, rng)` as the key pure/testable seam).
+  No code on disk yet. Alternatively, the `docs/USER_TESTING.md` items
+  above (especially "Nemo") are an open, unstarted, user-requested
+  backlog if priorities shift before `clanhold` is picked up.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
