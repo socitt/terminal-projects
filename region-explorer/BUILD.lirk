@@ -20,3 +20,15 @@ name = "runner_test"
 type = "test"
 srcs = ["runner_test.py"]
 deps = [":runner"]
+
+[[target]]
+name = "main"
+type = "library"
+srcs = ["main.py"]
+deps = [":runner", "//region-explorer/data:washington"]
+
+[[target]]
+name = "main_test"
+type = "test"
+srcs = ["main_test.py"]
+deps = [":main"]
