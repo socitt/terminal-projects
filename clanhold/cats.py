@@ -61,3 +61,10 @@ def cat_with_role(cats, role):
         if cat["role"] == role:
             return cat
     return None
+
+
+def set_cat_status(cats, name, status):
+    """Return a new cat list with the cat named `name` updated to
+    `status`. No-op (returns `cats` unchanged) if no cat has that name.
+    """
+    return [dict(cat, status=status) if cat["name"] == name else cat for cat in cats]
