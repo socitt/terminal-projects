@@ -271,6 +271,7 @@ None of these are bugs in what exists; they are unbuilt v1 surface.
 | G7 | **Roles are partly decorative.** The healer now affects recovery odds (G2); the leader role still has no mechanical effect. | Medium |
 | G8 | **`patrol` fails silently** where `hunt`/`gather_water` raise. | Low — but the runner cannot tell the player why nothing happened. |
 | G9 | **Ring-only zone graphs.** Every zone has exactly 2 neighbours, so expansion is a walk along a line. | Low — fine for v1, limits replay value. |
+| G10 | **The day report nets out hunting against upkeep.** It can only show `Food 5 -> 5`, never "the hunt brought 2, the clan ate 2" — a hunt's yield is not recoverable by diffing states. | Medium — a player can derive it from the one-per-cat rule in `README.md`, but a bad-weather hunt that yields 0 is indistinguishable from one that fed the clan. |
 
 ---
 
@@ -318,7 +319,16 @@ Phase A before Phase B was deliberate: building UI over a loop with no
 consumption and no ending would have meant rewriting the screens once
 those landed.
 
-Two things Phase B surfaced for whoever picks up Phase C:
+Three things Phase B surfaced for whoever picks up Phase C:
+
+- **G10 needs a contract decision, not a patch.** Closing it means
+  either `advance_day` returning a per-day result alongside the state
+  (clean, but it is the one L2 signature everything depends on), or the
+  runner re-deriving `len(cats) * upkeep.FOOD_PER_CAT` to split the
+  line (cheap, but puts a second copy of the consumption rule in the UI
+  layer, exactly what the day-report rule in §4 exists to prevent).
+  The first is the right one if the report is worth changing the seam
+  for; neither should be done in passing.
 
 - **A cat's status doesn't gate hunting.** A sick cat hunts as well as
   a healthy one, and the runner offers it. Part of the same decorative

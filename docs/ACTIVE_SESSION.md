@@ -1508,10 +1508,14 @@ test //...` 32/32 tests, with `.lirk-cache.json` cleared.
    playable game end to end: `python3 furminal/main.py`. Phase C
    (structure costs/effects, meaningful traits, disposition
    consequences) is optional and unstarted — see `ARCHITECTURE.md` §8,
-   which also now records two smaller findings from Phase B: a cat's
-   status doesn't gate hunting (a sick cat hunts as well as a healthy
-   one), and G8 is worked around in the runner rather than closed in
-   `advance_day`.
+   which also now records three findings from Phase B: **G10**, the day
+   report netting a hunt's yield out against upkeep so `Food 5 -> 5` is
+   all it can say (found on an active 12-day playthrough — a
+   storm-halved hunt looks identical to one that fed the clan, and
+   closing it means either `advance_day` returning a per-day result or
+   the UI re-deriving upkeep's rule, a contract decision either way); a
+   cat's status not gating hunting; and G8 being worked around in the
+   runner rather than closed in `advance_day`.
 
 ## Next up
 
