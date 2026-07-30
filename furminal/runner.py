@@ -181,6 +181,14 @@ def _day_report_lines(before, after):
         f"Food {before['food']} -> {after['food']}, "
         f"water {before['water']} -> {after['water']}."
     )
+    # Read off the stores rather than from upkeep's shortfall flags: an
+    # empty store is what the player can act on, and phrasing it this
+    # way keeps `upkeep.FOOD_PER_CAT`'s consumption rule out of the UI
+    # layer, where a copy of it could quietly go stale.
+    if after["food"] == 0:
+        lines.append("The food stores are empty.")
+    if after["water"] == 0:
+        lines.append("The water stores are empty.")
 
     before_status = {cat["name"]: cat["status"] for cat in before["cats"]}
     after_status = {cat["name"]: cat["status"] for cat in after["cats"]}
@@ -366,7 +374,13 @@ def _prompt_day_actions(state):
 def run(state, save_path, rng=random):
     """Run the interactive day loop against `state` until the game
     ends (win or loss) or the player saves and quits. Returns the
-    final state either way."""
+    final state either way.
+
+    A finished game clears `save_path`, same as `adventure-engine`'s
+    runner does at an ending: a save of an already-over game would
+    otherwise be resumable forever, replaying its own ending on every
+    launch without a single playable day in between.
+    """
     while not game.is_game_over(state):
         actions = _prompt_day_actions(state)
         if actions is _QUIT:
@@ -376,6 +390,9 @@ def run(state, save_path, rng=random):
         next_state = game.advance_day(state, actions, rng)
         _show_day_report(state, next_state)
         state = next_state
+
+    if os.path.exists(save_path):
+        os.remove(save_path)
 
     term.clear_screen()
     if game.outcome(state) == "won":
