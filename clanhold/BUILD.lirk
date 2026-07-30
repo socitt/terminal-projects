@@ -119,3 +119,15 @@ name = "game_test"
 type = "test"
 srcs = ["game_test.py"]
 deps = [":game", ":camp", ":cats", ":clans", ":events", ":territory", ":upkeep", ":weather"]
+
+[[target]]
+name = "runner"
+type = "library"
+srcs = ["runner.py"]
+deps = [":camp", ":clans", ":game", ":territory", "//shared:term", "//shared:input"]
+
+[[target]]
+name = "runner_test"
+type = "test"
+srcs = ["runner_test.py"]
+deps = [":runner", ":camp", ":game"]
