@@ -8,8 +8,19 @@ import cats
 import clans
 import events
 import territory
+import upkeep
 import weather
-from game import STARTING_FOOD, STARTING_WATER, advance_day, load_state, new_game, save_state
+from game import (
+    STARTING_FOOD,
+    STARTING_WATER,
+    SURVIVAL_GOAL_DAYS,
+    advance_day,
+    is_game_over,
+    load_state,
+    new_game,
+    outcome,
+    save_state,
+)
 
 
 class _FakeRng:
@@ -100,8 +111,8 @@ class AdvanceDayQuietDayTest(unittest.TestCase):
         self.assertEqual(updated["weather"], "clear")
         self.assertEqual(updated["other_clans"][0]["disposition"], 10)
         self.assertEqual(updated["cats"], state["cats"])
-        self.assertEqual(updated["food"], 5)
-        self.assertEqual(updated["water"], 5)
+        self.assertEqual(updated["food"], 5 - 2 * upkeep.FOOD_PER_CAT)
+        self.assertEqual(updated["water"], 5 - 2 * upkeep.WATER_PER_CAT)
         self.assertEqual(updated["event_log"], [])
 
     def test_does_not_mutate_input_state(self):
@@ -119,17 +130,20 @@ class AdvanceDayHuntTest(unittest.TestCase):
             randints=[3] + _QUIET_RANDINTS,
         )
         updated = advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)
-        self.assertEqual(updated["food"], 8)
+        self.assertEqual(updated["food"], 8 - 2 * upkeep.FOOD_PER_CAT)
         self.assertEqual(cats.cat_with_role(updated["cats"], "leader")["status"], "healthy")
 
     def test_large_mammal_encounter_injures_cat_and_yields_no_food(self):
         state = _fixture_state()
+        # Extra 0.9 (>= the healer-boosted recovery chance) forces the
+        # newly-injured leader's same-day recovery roll to fail, so the
+        # injury is still observable at day's end.
         rng = _FakeRng(
-            randoms=[0.02, 0.3] + _QUIET_RANDOMS,
+            randoms=[0.02, 0.3, 0.9] + _QUIET_RANDOMS,
             randints=list(_QUIET_RANDINTS),
         )
         updated = advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)
-        self.assertEqual(updated["food"], 5)
+        self.assertEqual(updated["food"], 5 - 2 * upkeep.FOOD_PER_CAT)
         self.assertEqual(cats.cat_with_role(updated["cats"], "leader")["status"], "injured")
 
     def test_raises_for_uncontrolled_zone(self):
@@ -152,12 +166,15 @@ class AdvanceDayHuntTest(unittest.TestCase):
             state = _fixture_state(weather=weather_state)
             return advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)["food"]
 
-        self.assertEqual(_run("clear"), 9)
-        self.assertEqual(_run("storm"), 7)
+        self.assertEqual(_run("clear"), 9 - 2 * upkeep.FOOD_PER_CAT)
+        self.assertEqual(_run("storm"), 7 - 2 * upkeep.FOOD_PER_CAT)
 
     def test_injured_cat_is_the_one_that_hunted(self):
         state = _fixture_state()
-        rng = _FakeRng(randoms=[0.02, 0.3] + _QUIET_RANDOMS, randints=list(_QUIET_RANDINTS))
+        # Extra 0.5 (>= the base recovery chance; the healer herself is
+        # the one injured here, so no healer bonus applies) forces the
+        # same-day recovery roll to fail.
+        rng = _FakeRng(randoms=[0.02, 0.3, 0.5] + _QUIET_RANDOMS, randints=list(_QUIET_RANDINTS))
         updated = advance_day(state, {"hunt": {"cat": "Willow", "zone": "home"}}, rng)
         by_name = {cat["name"]: cat for cat in updated["cats"]}
         self.assertEqual(by_name["Willow"]["status"], "injured")
@@ -171,7 +188,7 @@ class AdvanceDayGatherWaterTest(unittest.TestCase):
         })
         rng = _FakeRng(randoms=list(_QUIET_RANDOMS), randints=[4] + _QUIET_RANDINTS)
         updated = advance_day(state, {"gather_water": {"zone": "home"}}, rng)
-        self.assertEqual(updated["water"], 9)
+        self.assertEqual(updated["water"], 9 - 2 * upkeep.WATER_PER_CAT)
 
     def test_raises_for_uncontrolled_zone(self):
         state = _fixture_state(zones={
@@ -190,8 +207,8 @@ class AdvanceDayGatherWaterTest(unittest.TestCase):
             })
             return advance_day(state, {"gather_water": {"zone": "home"}}, rng)["water"]
 
-        self.assertEqual(_run("clear"), 9)
-        self.assertEqual(_run("storm"), 7)
+        self.assertEqual(_run("clear"), 9 - 2 * upkeep.WATER_PER_CAT)
+        self.assertEqual(_run("storm"), 7 - 2 * upkeep.WATER_PER_CAT)
 
 
 class AdvanceDayPatrolTest(unittest.TestCase):
@@ -270,7 +287,10 @@ class AdvanceDayEventTest(unittest.TestCase):
             choices=[chosen_event],
         )
         updated = advance_day(state, {}, rng)
-        self.assertEqual(updated["food"], max(0, 5 + chosen_event["food_delta"]))
+        self.assertEqual(
+            updated["food"],
+            max(0, 5 - 2 * upkeep.FOOD_PER_CAT + chosen_event["food_delta"]),
+        )
         self.assertEqual(updated["event_log"], [
             {"day": 5, "id": chosen_event["id"], "text": chosen_event["text"]},
         ])
@@ -278,8 +298,12 @@ class AdvanceDayEventTest(unittest.TestCase):
 
 class AdvanceDayFoodClampTest(unittest.TestCase):
     def test_negative_event_delta_clamps_food_at_zero(self):
+        """food=3 clears upkeep (2 cats, no shortfall) with 1 left, then
+        the event's -2 delta pushes it negative — still the clamp this
+        test is about, just composed with upkeep instead of standing
+        alone."""
         storm_damage = next(e for e in events.EVENTS if e["food_delta"] == -2)
-        state = _fixture_state(food=1)
+        state = _fixture_state(food=3)
         rng = _FakeRng(randoms=[0.1, 0.99, 0.01], randints=[0], choices=[storm_damage])
         updated = advance_day(state, {}, rng)
         self.assertEqual(updated["food"], 0)
@@ -307,8 +331,8 @@ class AdvanceDayCombinedActionsTest(unittest.TestCase):
             "unlock_structure": "nursery",
         }, rng)
 
-        self.assertEqual(updated["food"], 8)
-        self.assertEqual(updated["water"], 9)
+        self.assertEqual(updated["food"], 8 - 2 * upkeep.FOOD_PER_CAT)
+        self.assertEqual(updated["water"], 9 - 2 * upkeep.WATER_PER_CAT)
         self.assertTrue(updated["zones"]["a"]["controlled"])
         self.assertEqual(updated["camp"]["structures"], ["nursery"])
         self.assertEqual(updated["day"], 6)
@@ -324,16 +348,87 @@ class AdvanceDayDispositionTest(unittest.TestCase):
 
 class AdvanceDayPropertyTest(unittest.TestCase):
     def test_invariants_hold_across_many_seeds(self):
+        """Cat count is no longer non-decreasing (upkeep can kill an
+        already-"sick" cat on a shortfall) — every 5th seed starts with
+        a sick leader and low food/water specifically to exercise that
+        path here rather than assume it, matching upkeep_test.py's
+        direct coverage of the same rule."""
         for seed in range(100):
-            state = _fixture_state()
-            updated = advance_day(state, {}, random.Random(seed))
+            rng = random.Random(seed)
+            state = _fixture_state(
+                food=rng.randint(0, 4),
+                water=rng.randint(0, 4),
+                cats=[
+                    cats.new_cat(
+                        "Ash", ["brave"], role="leader",
+                        status="sick" if seed % 5 == 0 else "healthy",
+                    ),
+                    cats.new_cat("Willow", ["quick"], role="healer"),
+                ],
+            )
+            updated = advance_day(state, {}, rng)
+
             self.assertEqual(updated["day"], state["day"] + 1)
             self.assertGreaterEqual(updated["food"], 0)
             self.assertGreaterEqual(updated["water"], 0)
-            self.assertGreaterEqual(len(updated["cats"]), len(state["cats"]))
+            self.assertGreaterEqual(len(updated["cats"]), 0)
+            self.assertLessEqual(len(updated["cats"]), len(state["cats"]) + 1)
             self.assertEqual(set(updated["zones"]), set(state["zones"]))
             self.assertEqual(len(updated["other_clans"]), len(state["other_clans"]))
             self.assertIn(updated["weather"], weather.WEATHER_STATES)
+
+
+class AdvanceDayUpkeepIntegrationTest(unittest.TestCase):
+    """Direct rule coverage lives in upkeep_test.py; these confirm the
+    seam actually fires inside advance_day, cats and all."""
+
+    def test_food_shortfall_sickens_the_chosen_cat(self):
+        state = _fixture_state(food=0, water=5)
+        # Recovery roll (0.9) forced to fail so the new "sick" status is
+        # still observable at day's end, same reasoning as the hunt
+        # tests above.
+        rng = _FakeRng(randoms=[0.9, 0.1, 0.99, 0.99], randints=[0], choices=[state["cats"][0]])
+        updated = advance_day(state, {}, rng)
+
+        self.assertEqual(cats.cat_with_role(updated["cats"], "leader")["status"], "sick")
+        self.assertEqual(len(updated["cats"]), 2)
+        self.assertEqual(updated["food"], 0)
+
+    def test_shortfall_kills_an_already_sick_cat(self):
+        state = _fixture_state(food=0, water=5, cats=[
+            cats.new_cat("Ash", ["brave"], role="leader", status="sick"),
+            cats.new_cat("Willow", ["quick"], role="healer"),
+        ])
+        rng = _FakeRng(randoms=list(_QUIET_RANDOMS), randints=[0], choices=[state["cats"][0]])
+        updated = advance_day(state, {}, rng)
+
+        self.assertEqual([c["name"] for c in updated["cats"]], ["Willow"])
+
+
+class OutcomeTest(unittest.TestCase):
+    def test_none_while_ongoing(self):
+        state = _fixture_state(day=1)
+        self.assertIsNone(outcome(state))
+        self.assertFalse(is_game_over(state))
+
+    def test_lost_when_clan_dies_out(self):
+        state = _fixture_state(cats=[])
+        self.assertEqual(outcome(state), "lost")
+        self.assertTrue(is_game_over(state))
+
+    def test_not_won_on_the_goal_day_itself(self):
+        state = _fixture_state(day=SURVIVAL_GOAL_DAYS)
+        self.assertIsNone(outcome(state))
+        self.assertFalse(is_game_over(state))
+
+    def test_won_after_surviving_past_the_goal_day(self):
+        state = _fixture_state(day=SURVIVAL_GOAL_DAYS + 1)
+        self.assertEqual(outcome(state), "won")
+        self.assertTrue(is_game_over(state))
+
+    def test_lost_takes_priority_over_won(self):
+        state = _fixture_state(day=SURVIVAL_GOAL_DAYS + 1, cats=[])
+        self.assertEqual(outcome(state), "lost")
 
 
 class SaveLoadStateTest(unittest.TestCase):
