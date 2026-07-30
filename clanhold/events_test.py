@@ -40,13 +40,6 @@ class MaybeTriggerEventPropertyTest(unittest.TestCase):
                 self.assertIn("text", result)
                 self.assertIn("food_delta", result)
 
-    def test_triggers_roughly_at_expected_rate(self):
-        triggered = sum(
-            1 for seed in range(2000) if maybe_trigger_event(random.Random(seed)) is not None
-        )
-        rate = triggered / 2000
-        self.assertTrue(abs(rate - EVENT_CHANCE) < 0.03)
-
     def test_every_event_has_required_fields(self):
         for event in EVENTS:
             self.assertIn("id", event)

@@ -98,6 +98,40 @@ class ExploreZoneTest(unittest.TestCase):
             explore_zone(zones, "b")
 
 
+class OutwardExpansionTest(unittest.TestCase):
+    def test_far_zone_needs_the_chain_claimed_first(self):
+        """The two gates compose into contiguous outward growth: a zone
+        two hops out cannot be reached until the intervening zone is
+        both explored and controlled."""
+        zones = _chain_fixture()
+
+        self.assertFalse(can_explore(zones, "b"))
+        zones = explore_zone(zones, "a")
+        self.assertFalse(can_control(zones, "b"))
+
+        zones = control_zone(zones, "a")
+        zones = explore_zone(zones, "b")
+        self.assertTrue(can_control(zones, "b"))
+        zones = control_zone(zones, "b")
+
+        self.assertTrue(all(z["explored"] and z["controlled"] for z in zones.values()))
+
+    def test_generated_ring_can_be_fully_claimed_walking_one_way(self):
+        zones = generate_zone_graph(random.Random(7))
+        claimed = {"home"}
+        for _ in range(len(zones) - 1):
+            frontier = [
+                zid for zid in zones
+                if zid not in claimed and can_explore(zones, zid)
+            ]
+            self.assertTrue(frontier, "expansion stalled before claiming every zone")
+            zone_id = frontier[0]
+            zones = explore_zone(zones, zone_id)
+            zones = control_zone(zones, zone_id)
+            claimed.add(zone_id)
+        self.assertEqual(claimed, set(zones))
+
+
 class ControlZoneTest(unittest.TestCase):
     def test_rejects_unexplored_zone(self):
         zones = _chain_fixture()

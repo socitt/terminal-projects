@@ -139,6 +139,30 @@ class AdvanceDayHuntTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, random.Random(0))
 
+    def test_raises_key_error_for_unknown_zone(self):
+        with self.assertRaises(KeyError):
+            advance_day(
+                _fixture_state(), {"hunt": {"cat": "Ash", "zone": "nowhere"}}, random.Random(0)
+            )
+
+    def test_bad_weather_scales_down_hunt_food(self):
+        """Same hunt, same rng: storm (0.5x) must yield less than clear."""
+        def _run(weather_state):
+            rng = _FakeRng(randoms=[0.5] + _QUIET_RANDOMS, randints=[4] + _QUIET_RANDINTS)
+            state = _fixture_state(weather=weather_state)
+            return advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)["food"]
+
+        self.assertEqual(_run("clear"), 9)
+        self.assertEqual(_run("storm"), 7)
+
+    def test_injured_cat_is_the_one_that_hunted(self):
+        state = _fixture_state()
+        rng = _FakeRng(randoms=[0.02, 0.3] + _QUIET_RANDOMS, randints=list(_QUIET_RANDINTS))
+        updated = advance_day(state, {"hunt": {"cat": "Willow", "zone": "home"}}, rng)
+        by_name = {cat["name"]: cat for cat in updated["cats"]}
+        self.assertEqual(by_name["Willow"]["status"], "injured")
+        self.assertEqual(by_name["Ash"]["status"], "healthy")
+
 
 class AdvanceDayGatherWaterTest(unittest.TestCase):
     def test_gather_water_in_controlled_zone_adds_water(self):
@@ -155,6 +179,19 @@ class AdvanceDayGatherWaterTest(unittest.TestCase):
         })
         with self.assertRaises(ValueError):
             advance_day(state, {"gather_water": {"zone": "home"}}, random.Random(0))
+
+    def test_bad_weather_scales_down_gathered_water(self):
+        def _run(weather_state):
+            rng = _FakeRng(randoms=list(_QUIET_RANDOMS), randints=[4] + _QUIET_RANDINTS)
+            state = _fixture_state(weather=weather_state, zones={
+                "home": territory.new_zone(
+                    "home", "riverbank", explored=True, controlled=True
+                ),
+            })
+            return advance_day(state, {"gather_water": {"zone": "home"}}, rng)["water"]
+
+        self.assertEqual(_run("clear"), 9)
+        self.assertEqual(_run("storm"), 7)
 
 
 class AdvanceDayPatrolTest(unittest.TestCase):
@@ -237,6 +274,44 @@ class AdvanceDayEventTest(unittest.TestCase):
         self.assertEqual(updated["event_log"], [
             {"day": 5, "id": chosen_event["id"], "text": chosen_event["text"]},
         ])
+
+
+class AdvanceDayFoodClampTest(unittest.TestCase):
+    def test_negative_event_delta_clamps_food_at_zero(self):
+        storm_damage = next(e for e in events.EVENTS if e["food_delta"] == -2)
+        state = _fixture_state(food=1)
+        rng = _FakeRng(randoms=[0.1, 0.99, 0.01], randints=[0], choices=[storm_damage])
+        updated = advance_day(state, {}, rng)
+        self.assertEqual(updated["food"], 0)
+
+
+class AdvanceDayCombinedActionsTest(unittest.TestCase):
+    def test_all_four_actions_apply_in_one_day(self):
+        """Each action is unit-tested in isolation above; this pins that
+        they compose in a single advance_day call without clobbering each
+        other's slice of the state."""
+        state = _fixture_state(zones={
+            "home": territory.new_zone(
+                "home", "riverbank", adjacent=["a"], explored=True, controlled=True
+            ),
+            "a": territory.new_zone("a", "meadow", adjacent=["home"]),
+        })
+        rng = _FakeRng(
+            randoms=[0.5] + _QUIET_RANDOMS,
+            randints=[3, 4] + _QUIET_RANDINTS,
+        )
+        updated = advance_day(state, {
+            "hunt": {"cat": "Ash", "zone": "home"},
+            "gather_water": {"zone": "home"},
+            "patrol": {"zone": "a"},
+            "unlock_structure": "nursery",
+        }, rng)
+
+        self.assertEqual(updated["food"], 8)
+        self.assertEqual(updated["water"], 9)
+        self.assertTrue(updated["zones"]["a"]["controlled"])
+        self.assertEqual(updated["camp"]["structures"], ["nursery"])
+        self.assertEqual(updated["day"], 6)
 
 
 class AdvanceDayDispositionTest(unittest.TestCase):

@@ -4,7 +4,6 @@ import unittest
 from weather import (
     PERSIST_CHANCE,
     WEATHER_STATES,
-    YIELD_MULTIPLIER,
     advance_weather,
     yield_multiplier,
 )
@@ -61,9 +60,15 @@ class AdvanceWeatherPropertyTest(unittest.TestCase):
 
 
 class YieldMultiplierTest(unittest.TestCase):
-    def test_matches_table_for_every_state(self):
+    def test_every_weather_state_has_a_multiplier(self):
+        """A state added to WEATHER_STATES without a YIELD_MULTIPLIER
+        entry would KeyError at runtime mid-game, not at import."""
         for state in WEATHER_STATES:
-            self.assertEqual(yield_multiplier(state), YIELD_MULTIPLIER[state])
+            yield_multiplier(state)
+
+    def test_bad_weather_yields_strictly_less_than_clear(self):
+        for state in ("rain", "storm", "snow"):
+            self.assertLess(yield_multiplier(state), yield_multiplier("clear"))
 
     def test_always_positive_and_at_most_one(self):
         for state in WEATHER_STATES:

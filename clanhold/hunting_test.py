@@ -88,8 +88,17 @@ class ResolveWaterGatheringTest(unittest.TestCase):
             dry_result = resolve_water_gathering("cave", random.Random(seed))
             self.assertTrue(0 <= dry_result["water"] <= 1)
 
-    def test_water_terrain_constant_matches_usage(self):
-        self.assertEqual(WATER_TERRAIN, frozenset({"riverbank", "wetland"}))
+    def test_every_terrain_routes_to_the_correct_yield_branch(self):
+        """Every terrain in FOOD_YIELD must land in the wide branch iff it
+        is in WATER_TERRAIN — catches a terrain being added to one table
+        but not classified in the other."""
+        for terrain in FOOD_YIELD:
+            for seed in range(10):
+                water = resolve_water_gathering(terrain, random.Random(seed))["water"]
+                if terrain in WATER_TERRAIN:
+                    self.assertTrue(2 <= water <= 4, f"{terrain} yielded {water}")
+                else:
+                    self.assertTrue(0 <= water <= 1, f"{terrain} yielded {water}")
 
 
 if __name__ == "__main__":

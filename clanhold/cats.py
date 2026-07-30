@@ -26,6 +26,7 @@ TRAITS = [
 ]
 
 ROLES = ("leader", "healer")
+LEADER, HEALER = ROLES
 
 
 def new_cat(name, traits, role=None, status="healthy"):
@@ -50,8 +51,8 @@ def generate_starting_cats(rng):
         cats.append(new_cat(name, rng.sample(TRAITS, trait_count)))
 
     leader_idx, healer_idx = rng.sample(range(count), 2)
-    cats[leader_idx]["role"] = "leader"
-    cats[healer_idx]["role"] = "healer"
+    cats[leader_idx]["role"] = LEADER
+    cats[healer_idx]["role"] = HEALER
     return cats
 
 

@@ -2,7 +2,6 @@ import random
 import unittest
 
 from cats import (
-    ROLES,
     TRAITS,
     cat_with_role,
     generate_starting_cats,
@@ -102,9 +101,6 @@ class CatWithRoleTest(unittest.TestCase):
     def test_returns_none_when_absent(self):
         cats = [new_cat("Ash", ["brave"])]
         self.assertIsNone(cat_with_role(cats, "healer"))
-
-    def test_roles_constant_matches_usage(self):
-        self.assertEqual(ROLES, ("leader", "healer"))
 
 
 class SetCatStatusTest(unittest.TestCase):

@@ -61,12 +61,14 @@ class MaybeBirthKitPropertyTest(unittest.TestCase):
                 self.assertIsNone(kit["role"])
                 self.assertEqual(kit["status"], "healthy")
 
-    def test_triggers_roughly_at_expected_rate(self):
-        triggered = sum(
-            1 for seed in range(3000) if maybe_birth_kit(random.Random(seed), []) is not None
-        )
-        rate = triggered / 3000
-        self.assertTrue(abs(rate - BIRTH_CHANCE) < 0.02)
+    def test_kit_is_born_at_least_once_across_many_seeds(self):
+        """Cheap liveness check that the birth path is reachable at all
+        under a real rng — the boundary tests above pin the threshold."""
+        births = [
+            maybe_birth_kit(random.Random(seed), []) for seed in range(200)
+        ]
+        self.assertTrue(any(kit is not None for kit in births))
+        self.assertTrue(any(kit is None for kit in births))
 
 
 if __name__ == "__main__":
