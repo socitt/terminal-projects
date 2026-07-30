@@ -1131,16 +1131,77 @@ confirmed 10/10 across fresh-shell, cache-cleared `lirk test` runs
 (engine, data, runner) or standalone (main, given main_test's own
 subprocess overhead already stacks with lirk's).
 
-## Priority list status (2026-07-29, updated)
+## Done (2026-07-30): `clanhold` game-logic modules complete, runner/main not started
+
+Picked up `clanhold` exactly where the 2026-07-27 design session left
+off: V1 scope, data model, and module split were already signed off,
+but nothing existed on disk. Implemented all 8 independently-testable
+modules plus the orchestrating `game.py`, each in the same discipline
+as every prior project: small increments, commit per file (source,
+then tests, then `BUILD.lirk`), 2-3 injected mutations per module
+verified caught before moving on.
+
+- `cats.py` — cat dict shape, `generate_starting_cats` (3-4 cats,
+  2-3 unique traits each, exactly one leader/one healer), later
+  extended with `set_cat_status` for hunting-injury application.
+- `camp.py` — flat unlockable-structure catalog (`nursery`,
+  `herb_store`), no building tree per v1 scope.
+- `territory.py` — the per-region zone graph: 6-10 zones wired in a
+  ring, terrain + adjacency, fog-of-war modeled as two gates
+  (`can_explore`/`can_control`, each requiring adjacency to an
+  already-explored/-controlled zone) so territory grows outward from
+  a "home" zone one hop at a time. Deliberately agnostic to which
+  `region-explorer` region it belongs to — only ever takes/returns a
+  region id string, same engine/data split as `region-explorer`
+  itself; `game.py` never imports `region-explorer` directly.
+- `hunting.py` — hunt/water-gathering resolution; ambient wildlife
+  folded into the hunt outcome (rare "large_mammal" encounter can
+  injure the cat) rather than a standalone ecosystem sim, per the
+  signed-off v1 scope.
+- `clans.py` — the single neighboring clan (not multi-clan diplomacy):
+  disposition drifts by a small random step daily, clamped to
+  [-100, 100]. Names are plain space-separated place names,
+  deliberately not modeled on any existing game's clan-naming
+  convention.
+- `weather.py` — simple rotating weather (persist-or-roll-over each
+  day) exposing a yield multiplier that `game.py` applies to
+  hunting/gathering, keeping `hunting.py` itself weather-agnostic.
+- `events.py` — small curated event table (5 entries), not a general
+  event-authoring framework.
+- `population.py` — simple periodic kit-birth chance, not genetics: a
+  kit's name/trait are drawn from the same pools `cats.py` uses for
+  starting cats.
+- `game.py` — `game_state` shape (JSON-serializable, `region_id`
+  stored as an opaque tag), `new_game`, and `advance_day(state,
+  actions, rng)` composing all 8 modules. `actions` is a dict of
+  optional keys (`hunt`/`gather_water`/`patrol`/`unlock_structure`);
+  every background system (weather, disposition drift, kit-birth
+  roll, event roll) always runs regardless of chosen actions.
+  Hunting/gathering require the target zone already controlled;
+  patrol explores an adjacent zone and only claims control in the
+  same action if that zone is itself adjacent to already-controlled
+  territory (otherwise explored-but-uncontrolled, one patrol short of
+  claiming it). `save_state`/`load_state` follow the same
+  to-a-path/JSON convention as `adventure-engine/engine.py`.
+
+**Full-repo confirmation:** `lirk build //...` — 60/60 targets clean.
+**Not started this session:** `runner.py`/`main.py` (the interactive
+day loop and terminal UI), and the starting flow that hooks into
+`region-explorer`'s zoom UI for actual region/spot selection — `game.py`
+takes `region_id` as a plain argument and has no opinion on how it's
+chosen. No README yet either.
+
+## Priority list status (2026-07-30, updated)
 
 1. `shared/` — **done**.
 2. `board-games` — **done**.
 3. `adventure-engine` — **done**.
 4. `region-explorer` — **done**: overview + all 6 regions, zoom
    animation, mutation-verified engine/runner logic.
-5. `clanhold` — not started; design was signed off in the same
-   session `region-explorer`'s design was (see above), depends on
-   `region-explorer` existing, which it now does.
+5. `clanhold` — **game logic done** (all 8 modules + `game.py`,
+   mutation-verified, 60/60 targets clean); `runner.py`/`main.py`
+   (terminal UI, region-explorer-backed starting flow, save/resume
+   prompts) and `README.md` not started.
 
 ## Also outstanding (not part of the numbered build-order list)
 
@@ -1158,16 +1219,20 @@ them so a future session doesn't have to rediscover them by re-reading
 
 ## Next up
 
-- `clanhold` — next per the priority list above, and its design is
-  already signed off (see the 2026-07-27 entry above): V1 scope, data
-  model (zone graph per `region-explorer` region, single JSON-
-  serializable `game_state`), module split
-  (`cats.py`/`camp.py`/`territory.py`/`hunting.py`/`clans.py`/
-  `weather.py`/`events.py`/`population.py` composed by `game.py`, with
-  `advance_day(state, actions, rng)` as the key pure/testable seam).
-  No code on disk yet. Alternatively, the `docs/USER_TESTING.md` items
-  above (especially "Nemo") are an open, unstarted, user-requested
-  backlog if priorities shift before `clanhold` is picked up.
+- `clanhold/runner.py` + `main.py` — the interactive day loop (present
+  the day's state, take action input via `shared/input.py`, call
+  `game.advance_day`, loop) plus a starting flow that lets the player
+  pick a region via `region-explorer` (zoom UI) and a spot within it,
+  name the clan, then calls `game.new_game(rng, clan_name, region_id)`.
+  Save/resume prompts using `game.save_state`/`load_state`. Needs
+  integration tests (subprocess-based, same pattern as
+  `region-explorer/runner_test.py` and `main_test.py`) and a
+  `clanhold/README.md`. All 8 logic modules + `game.py` are done and
+  mutation-verified (see the 2026-07-30 entry above), so this is purely
+  UI/wiring work, no remaining game-logic design.
+- Alternatively, the `docs/USER_TESTING.md` items above (especially
+  "Nemo") are an open, unstarted, user-requested backlog if priorities
+  shift before `clanhold`'s UI layer is picked up.
 
 ## Open questions
 
