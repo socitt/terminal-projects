@@ -51,7 +51,7 @@ in-game text, or identifiers.
       ├──────────────────────────────────────────────────────────────
  L1  population.py                → cats.py
       ├──────────────────────────────────────────────────────────────
- L0  cats  camp  territory  hunting  clans  weather  events
+ L0  cats  camp  territory  hunting  clans  weather  events  upkeep
                                   no clanhold-internal dependencies
 ```
 
@@ -89,7 +89,7 @@ can be tested without importing map data. This mirrors the existing
 
 | Module | Owns | Key API |
 | --- | --- | --- |
-| `cats.py` | Cat dicts, name/trait pools, roster generation | `new_cat`, `generate_starting_cats(rng)`, `cat_with_role`, `set_cat_status` |
+| `cats.py` | Cat dicts, name/trait pools, roster generation, recovery | `new_cat`, `generate_starting_cats(rng)`, `cat_with_role`, `set_cat_status`, `maybe_recover(cats, rng)` |
 | `camp.py` | Structure catalog, unlock state | `new_camp`, `has_structure`, `unlock_structure` |
 | `territory.py` | Zone graph, fog-of-war gates | `generate_zone_graph(rng)`, `can_explore`/`explore_zone`, `can_control`/`control_zone` |
 | `hunting.py` | Hunt & water outcomes, wildlife risk | `resolve_hunt(terrain, rng)`, `resolve_water_gathering(terrain, rng)` |
@@ -97,7 +97,8 @@ can be tested without importing map data. This mirrors the existing
 | `weather.py` | Weather rotation and yield penalty | `advance_weather(current, rng)`, `yield_multiplier(weather)` |
 | `events.py` | Curated event table | `maybe_trigger_event(rng)` |
 | `population.py` | Kit births | `maybe_birth_kit(rng, existing_cats)` |
-| `game.py` | Composition, state, persistence | `new_game(rng, clan_name, region_id)`, `advance_day(state, actions, rng)`, `save_state`/`load_state` |
+| `upkeep.py` | Daily food/water consumption, shortfall consequences | `resolve_upkeep(cats, food, water, rng)` |
+| `game.py` | Composition, state, persistence, end conditions | `new_game(rng, clan_name, region_id)`, `advance_day(state, actions, rng)`, `is_game_over(state)`/`outcome(state)`, `save_state`/`load_state` |
 
 ---
 
@@ -147,12 +148,29 @@ Order of resolution — player actions first, then always-on systems:
 2. `gather_water` → water
 3. `patrol` → explore, then claim if eligible
 4. `unlock_structure` → camp
-5. disposition drift → weather → kit birth → event roll
+5. `upkeep.resolve_upkeep` → food/water consumption for the day's full
+   cat count; a shortfall sickens a random cat, or kills one already
+   "sick"
+6. `cats.maybe_recover` → injured/sick cats may return to "healthy",
+   at better odds with a healthy healer alive
+7. disposition drift → weather → kit birth → event roll
+
+Steps 5-6 run on the roster *after* actions 1-4 (so same-day hunting
+food counts toward upkeep) but *before* step 7 (so a same-day injury
+gets one recovery roll before the day ends).
 
 Errors: `ValueError` for an uncontrolled hunt/gather zone or a bad
 structure; `KeyError` for an unknown zone id. **`patrol` is the
 exception — it silently no-ops** when the zone is neither explorable
 nor claimable. See gap G8.
+
+### `is_game_over(state)` / `outcome(state)`
+
+Not part of `advance_day` — called by the (not yet built) runner after
+each day. `outcome` returns `"lost"` (the clan has died out — checked
+first), `"won"` (survived past `SURVIVAL_GOAL_DAYS`, currently 20), or
+`None` if the game is still ongoing. `is_game_over` is just
+`outcome(state) is not None`.
 
 ---
 
@@ -163,7 +181,10 @@ Enforced by tests; treat a break as a bug, not a design change.
 - `advance_day` never mutates the input state.
 - `day` increases by exactly 1 per call.
 - `food`/`water` never go negative (clamped at 0).
-- Cat count never decreases (nothing kills cats yet — see G3).
+- **Cat count can now decrease.** A food or water shortfall during
+  upkeep kills a cat that was already "sick" (see `upkeep.py`). It can
+  never drop below 0, and at most one kit is added per day, so
+  `0 <= len(next_cats) <= len(cats) + 1` always holds.
 - Zone ids are stable: `advance_day` never adds or removes zones.
 - Territory grows contiguously: a zone is explorable only when adjacent
   to an explored zone, claimable only when explored *and* adjacent to a
@@ -202,31 +223,29 @@ Enforced by tests; treat a break as a bug, not a design change.
 
 ## 7. Known gaps
 
-Found in the 2026-07-30 review. The logic layer is complete and tested,
-but several systems are **inert** — they carry state that nothing reads.
+Found in the 2026-07-30 review; G1-G3 closed the same day Phase A
+landed (below). The logic layer is complete and tested, but several
+systems are still **inert** — they carry state that nothing reads.
 None of these are bugs in what exists; they are unbuilt v1 surface.
 
 | # | Gap | Impact |
 | --- | --- | --- |
-| G1 | **No daily consumption.** Cats never eat or drink. `food`/`water` only ever rise. | Critical — there is no survival pressure, so no game. |
-| G2 | **Injuries are permanent.** `set_cat_status` sets `"injured"`; nothing clears it. The `healer` role has no effect. | High — injury is a one-way ratchet. |
-| G3 | **No end condition.** Nothing can end a run, win or lose. | High — needed before the loop is playable. |
+| ~~G1~~ | ~~No daily consumption.~~ **Closed by `upkeep.py`.** | — |
+| ~~G2~~ | ~~Injuries are permanent.~~ **Closed by `cats.maybe_recover`.** | — |
+| ~~G3~~ | ~~No end condition.~~ **Closed by `game.is_game_over`/`outcome`.** | — |
 | G4 | **Structures are inert and free.** `nursery`/`herb_store` unlock at no cost and change nothing. | Medium |
 | G5 | **Traits are decorative.** 15 traits, zero mechanical effect. | Medium |
 | G6 | **Disposition is decorative.** It drifts and is never read; `disposition_tier` has no caller. | Medium |
-| G7 | **Roles are decorative** beyond being assigned. | Medium |
+| G7 | **Roles are partly decorative.** The healer now affects recovery odds (G2); the leader role still has no mechanical effect. | Medium |
 | G8 | **`patrol` fails silently** where `hunt`/`gather_water` raise. | Low — but the runner cannot tell the player why nothing happened. |
 | G9 | **Ring-only zone graphs.** Every zone has exactly 2 neighbours, so expansion is a walk along a line. | Low — fine for v1, limits replay value. |
-
-G1–G3 are what stand between the current logic layer and something
-playable. They are Phase A below.
 
 ---
 
 ## 8. Roadmap
 
 **Phase A — make it a game.** Closes G1–G3. Nothing here needs UI, so it
-stays inside the fast pure-logic test loop.
+stayed inside the fast pure-logic test loop. **Done (2026-07-30).**
 
 - A1 `upkeep.py`: daily food/water consumption, starvation → `"sick"`.
 - A2 recovery: healer clears `"injured"`/`"sick"` over time; gives the
@@ -235,7 +254,7 @@ stays inside the fast pure-logic test loop.
   out, survive-N-days as the v1 win (G3).
 
 **Phase B — make it playable.** The terminal UI. After Phase A this
-produces a game someone can finish.
+produces a game someone can finish. **Not started — next up.**
 
 - B1 `runner.py` day loop and status screen.
 - B2 start flow: region pick via region-explorer, spot, clan name.
