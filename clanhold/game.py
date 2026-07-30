@@ -22,8 +22,8 @@ saved via `save_state`/`load_state`):
 a state, one day's chosen actions, and an injectable rng (same pattern
 as `backgammon.roll_dice(rng)`), it returns the next day's state.
 `actions` is a dict where every key is optional — an empty dict `{}`
-still advances weather, clan disposition, and rolls for a kit birth
-and a random event:
+still runs daily upkeep, recovery, weather, clan disposition, and rolls
+for a kit birth and a random event:
     {
         "hunt": {"cat": "<name>", "zone": "<controlled zone id>"},
         "gather_water": {"zone": "<controlled zone id>"},
@@ -41,6 +41,7 @@ import events
 import hunting
 import population
 import territory
+import upkeep
 import weather
 
 STARTING_FOOD = 5
@@ -72,6 +73,9 @@ def advance_day(state, actions, rng):
     Raises ValueError if `hunt`/`gather_water` names an uncontrolled
     zone, or if `unlock_structure` is invalid (see `camp.unlock_structure`).
     Raises KeyError if any action names a zone id not in `state["zones"]`.
+
+    Cat count can decrease: a food/water shortfall during upkeep can
+    kill an already-"sick" cat (see `upkeep.resolve_upkeep`).
     """
     cats_list = state["cats"]
     zones = state["zones"]
@@ -110,6 +114,13 @@ def advance_day(state, actions, rng):
     if unlock_structure is not None:
         camp_state = camp.unlock_structure(camp_state, unlock_structure)
 
+    upkeep_result = upkeep.resolve_upkeep(cats_list, food, water, rng)
+    cats_list = upkeep_result["cats"]
+    food = upkeep_result["food"]
+    water = upkeep_result["water"]
+
+    cats_list = cats.maybe_recover(cats_list, rng)
+
     other_clans = [clans.drift_disposition(clan, rng) for clan in state["other_clans"]]
     weather_state = weather.advance_weather(state["weather"], rng)
 
@@ -135,6 +146,29 @@ def advance_day(state, actions, rng):
         "water": max(0, water),
         "event_log": event_log,
     }
+
+
+SURVIVAL_GOAL_DAYS = 20
+
+
+def outcome(state):
+    """Return "lost", "won", or None if `state` isn't a finished game.
+
+    "lost": the clan has died out (no cats left) — checked first, so a
+    clan that survives to day `SURVIVAL_GOAL_DAYS` but is then wiped
+    out the same day still reads as a loss.
+    "won" (the v1 win condition): survived past `SURVIVAL_GOAL_DAYS`.
+    """
+    if not state["cats"]:
+        return "lost"
+    if state["day"] > SURVIVAL_GOAL_DAYS:
+        return "won"
+    return None
+
+
+def is_game_over(state):
+    """True if `outcome(state)` is not None."""
+    return outcome(state) is not None
 
 
 def save_state(state, path):
