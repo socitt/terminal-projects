@@ -88,6 +88,17 @@ srcs = ["population_test.py"]
 deps = [":population", ":cats"]
 
 [[target]]
+name = "upkeep"
+type = "library"
+srcs = ["upkeep.py"]
+
+[[target]]
+name = "upkeep_test"
+type = "test"
+srcs = ["upkeep_test.py"]
+deps = [":upkeep"]
+
+[[target]]
 name = "game"
 type = "library"
 srcs = ["game.py"]
