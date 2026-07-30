@@ -130,4 +130,16 @@ deps = [":camp", ":clans", ":game", ":territory", "//shared:term", "//shared:inp
 name = "runner_test"
 type = "test"
 srcs = ["runner_test.py"]
-deps = [":runner", ":camp", ":game"]
+deps = [":runner", ":camp", ":events", ":game"]
+
+[[target]]
+name = "main"
+type = "library"
+srcs = ["main.py"]
+deps = [":runner"]
+
+[[target]]
+name = "main_test"
+type = "test"
+srcs = ["main_test.py"]
+deps = [":main"]
