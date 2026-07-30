@@ -1406,3 +1406,125 @@ loop is fun — see `ARCHITECTURE.md` §8.
 - None beyond the SIGHUP blocker above (now tracked in
   `docs/KNOWN_ISSUES.md`, not just here) — that blocker is Please-specific
   and moot for any target now running under `lirk`.
+
+## Done (2026-07-30, new session): rename to `furminal`, Phase A review, Phase B
+
+### Rename: `clanhold` -> `furminal`
+
+Directory, `lirk` target paths (`//furminal:...`), every module
+docstring, `ARCHITECTURE.md`, and the two references outside the
+project (the top-level README's layout list, and
+`region-explorer/runner.py`'s `select_region` docstring, which names
+its one caller). Dated entries in this log keep the old name as
+written — a log that rewrites its own history is worth less than a
+stale name. `docs/USER_TESTING.md`'s single mention got an inline
+"renamed `furminal` on 2026-07-30" note instead. Verified with a
+cleared `.lirk-cache.json`: 31/31 tests. Commit `81a44e5`.
+
+### Phase A review
+
+Reviewed by simulation rather than by re-reading the code — 200 seeds
+per policy, driving `advance_day` directly:
+
+- doing nothing: **200/200 losses**, avg 7 days;
+- a plain hunt/gather/patrol policy: **~49% wins**, avg 15.4 days;
+- total famine from day 1: wipeout in **3-8 days**.
+
+So Phase A's survival pressure is real and the win condition is
+reachable. No retuning needed for v1, and the numbers are now recorded
+in `ARCHITECTURE.md` §8 so the next session doesn't re-derive them.
+
+One real defect found, in the docs rather than the code: a day with
+**both** a food and a water shortfall resolves two independent hits, so
+it can kill **two** already-"sick" cats. §5 described the death path in
+the singular, and `AdvanceDayPropertyTest` asserted only
+`len(cats) >= 0`, which no death rate can violate. Tightened the bound
+to `len(cats) - 2 <= len(next) <= len(cats) + 1`, and added the two
+upkeep tests that pin it: a shortfall kills only the cat it picks
+(being "sick" is not itself fatal), and two shortfalls can empty a
+two-sick-cat roster. The first of those was written twice — the initial
+version passed against a "kill every sick cat" mutation, i.e. it could
+not fail for the reason it existed. Commit `d1f11cf`.
+
+### Phase B — make it playable
+
+B1/B2 existed as a WIP commit (`b6c13d9`) from the previous session;
+playing that loop is what found the rest.
+
+- **B1** `runner.py` gained an **end-of-day report** and a
+  **planned-action list**. Before: the screen cleared straight from one
+  day's status into the next, so events, deaths, injuries, births and
+  weather changes were invisible (events only ever reached
+  `event_log`), and a mis-picked zone could not be taken back.
+  `_day_report_lines(before, after)` derives the day's news by
+  *diffing* the two states, in `advance_day`'s own resolution order —
+  deliberately not a log returned by `advance_day`, so the L2 contract
+  stays put and all player-facing phrasing stays in the only layer
+  allowed to print. Being pure, it is unit-tested directly instead of
+  through scripted playthroughs. Also `c. Clear planned actions`, and
+  wrapping for event prose (the one place a line overruns
+  `term.DEFAULT_WIDTH`). Commits `9f13f7d`, `452734a`.
+- **B2** camp spots. The v1 scope has said "pick a region, pick a spot,
+  name the clan" since 2026-07-27; the WIP flow skipped the spot.
+  `game.generate_camp_spots(rng, count)` returns candidate zone graphs
+  and `new_game` takes the chosen one as `zones=` — generation stayed
+  in `game.py` so `game_state` is still only ever assembled at L2. The
+  choice has weight: home terrain drives hunt and water yields.
+  Commits `0b01370`, `74747f9`, `86111f0`.
+- **B3** `main.py`, same shape as `region-explorer/main.py`. Smoke-
+  testing it found a real bug: a finished game left its save in place,
+  so the next launch resumed it and replayed its own ending forever.
+  `run` now deletes the save at an ending, same as `adventure-engine`'s
+  runner. The same smoke test showed a starving day reporting only
+  "Food 0 -> 0.", so the report now calls out an empty store — read off
+  the stores, not off `upkeep.FOOD_PER_CAT`, to keep a second copy of
+  the consumption rule out of the UI. Commits `bf91a4f`, `ef75542`.
+- **B4** `main_test.py`: the real script, real map data, real rng, real
+  save path. Covers what only that layer can — region-explorer's zoom
+  UI driven to a settled region, then spot, then clan name, then the
+  day loop — plus save/resume across two runs and declining the resume
+  prompt. Outcomes are deliberately *not* asserted there (main.py owns
+  the real rng and goal); `runner_test.py` pins win and loss down by
+  injection. Commits `dc85ad7`, `eabb2a3`.
+- **B5** `furminal/README.md`, in the same register as the other
+  projects' — what the day loop is, what each action does, the module
+  layering with test counts, and the save shape.
+
+**Mutation discipline:** 12 injected mutations across the session, all
+caught (report skipped, report shown past the ending, whole event log
+replayed, claimed zone also reported scouted, clear turned into a
+no-op, planned lines suppressed, save surviving the ending, empty-store
+warning dropped, chosen spot ignored, all spots identical, spot pick
+skipped, resume branch ignoring the save). Two mutation runs had to be
+redone after a `git checkout` restore reverted uncommitted source —
+commit before mutating, not after.
+
+**Full-repo confirmation:** `lirk build //...` 66/66 targets, `lirk
+test //...` 32/32 tests, with `.lirk-cache.json` cleared.
+
+## Priority list status (2026-07-30, updated again)
+
+5. `furminal` (was `clanhold`) — **Phase A and Phase B done.** It is a
+   playable game end to end: `python3 furminal/main.py`. Phase C
+   (structure costs/effects, meaningful traits, disposition
+   consequences) is optional and unstarted — see `ARCHITECTURE.md` §8,
+   which also now records two smaller findings from Phase B: a cat's
+   status doesn't gate hunting (a sick cat hunts as well as a healthy
+   one), and G8 is worked around in the runner rather than closed in
+   `advance_day`.
+
+## Next up
+
+Nothing is blocked. Two candidate directions:
+
+- **`furminal` Phase C** — closes G4-G7, the decorative systems
+  (structure costs and effects, traits with mechanical weight,
+  disposition consequences). Worth doing only if play says the loop is
+  fun; that judgement now needs a human at a terminal, not another
+  simulation.
+- **`docs/USER_TESTING.md` backlog** — still unstarted and still
+  user-requested: the "Nemo" computer opponent for all 5 board games
+  (3 difficulty levels, "Nemo cam" stretch goal), connect4's
+  out-of-range column-input bug, missing rematch prompts, the self-loop
+  choice UX gap in both stories, and the requested storyboarding
+  sessions.

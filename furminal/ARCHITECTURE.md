@@ -8,7 +8,11 @@ clan next door.
 This document is the contract between modules. It exists so work can be
 picked up cold without re-deriving the design from the code. For the
 original signed-off scope discussion see `docs/ACTIVE_SESSION.md`
-(2026-07-27 entry); for what is built so far see the 2026-07-30 entry.
+(2026-07-27 entry); for what is built so far see the 2026-07-30 entries.
+`README.md` is the player-facing view of the same thing.
+
+The project was called `clanhold` until 2026-07-30. Dated session-log
+entries keep the old name; everything else uses `furminal`.
 
 ---
 
@@ -40,9 +44,9 @@ in-game text, or identifiers.
 ## 2. Layers and dependency rules
 
 ```
- L4  main.py                      thin entrypoint, supplies real data
+ L4  main.py                      thin entrypoint, supplies the save path
       │
- L3  runner.py                    all I/O: prompts, rendering, loop
+ L3  runner.py                    all I/O: prompts, rendering, loop, report
       │                           ← shared/term.py, shared/input.py
       │                           ← region-explorer (start flow only)
       ├──────────────────────────────────────────────────────────────
@@ -98,7 +102,9 @@ can be tested without importing map data. This mirrors the existing
 | `events.py` | Curated event table | `maybe_trigger_event(rng)` |
 | `population.py` | Kit births | `maybe_birth_kit(rng, existing_cats)` |
 | `upkeep.py` | Daily food/water consumption, shortfall consequences | `resolve_upkeep(cats, food, water, rng)` |
-| `game.py` | Composition, state, persistence, end conditions | `new_game(rng, clan_name, region_id)`, `advance_day(state, actions, rng)`, `is_game_over(state)`/`outcome(state)`, `save_state`/`load_state` |
+| `game.py` | Composition, state, persistence, end conditions | `new_game(rng, clan_name, region_id, zones=None)`, `generate_camp_spots(rng, count)`, `advance_day(state, actions, rng)`, `is_game_over(state)`/`outcome(state)`, `save_state`/`load_state` |
+| `runner.py` | All I/O: start flow, status screen, action menu, day report | `start_flow(save_path, rng)`, `run(state, save_path, rng)` |
+| `main.py` | Save path, wiring | `main()` |
 
 ---
 
@@ -166,11 +172,36 @@ nor claimable. See gap G8.
 
 ### `is_game_over(state)` / `outcome(state)`
 
-Not part of `advance_day` — called by the (not yet built) runner after
+Not part of `advance_day` — the runner's loop condition, checked before
 each day. `outcome` returns `"lost"` (the clan has died out — checked
 first), `"won"` (survived past `SURVIVAL_GOAL_DAYS`, currently 20), or
 `None` if the game is still ongoing. `is_game_over` is just
 `outcome(state) is not None`.
+
+### `new_game(rng, clan_name, region_id, zones=None)`
+
+`zones` is the camp spot the player picked out of
+`generate_camp_spots(rng, count)`; None generates one instead, which is
+what tests that don't care about the spot use. Spot generation lives in
+`game.py` rather than the runner so `game_state` is still only ever
+assembled at L2 (rule 2 above) — the runner describes the candidates
+and takes the pick.
+
+### The day report
+
+`runner._day_report_lines(before, after)` derives the day's news by
+diffing the pre- and post-`advance_day` states: territory gained,
+stores, deaths and status changes, weather, births, new event-log
+entries. Deliberately **not** a log returned by `advance_day` — every
+consequence the player needs is already recoverable from the two
+states, so this contract stays put and all player-facing phrasing stays
+in the one layer allowed to do I/O. It is pure, so it is unit-tested
+directly rather than through a scripted playthrough.
+
+A corollary worth keeping: the report reads *state*, never a rule. It
+says "The food stores are empty" off `food == 0`, not "the clan went
+hungry" off a re-derived `len(cats) * FOOD_PER_CAT`, which would put a
+second copy of upkeep's consumption rule in the UI layer.
 
 ---
 
@@ -254,22 +285,45 @@ stayed inside the fast pure-logic test loop. **Done (2026-07-30).**
 - A3 `is_game_over(state)` / `outcome(state)`: lose when the clan dies
   out, survive-N-days as the v1 win (G3).
 
-**Phase B — make it playable.** The terminal UI. After Phase A this
-produces a game someone can finish. **Not started — next up.**
+Reviewed again after Phase B landed, by simulating 200 seeds per policy
+rather than by reading the code: doing nothing loses 200/200 (avg 7
+days), a reasonable hunt/gather/patrol policy wins ~49%, and a total
+famine wipes a clan out in 3–8 days. The pressure Phase A was for is
+real and the win condition is reachable, so v1 needs no retuning. The
+probe also found the roster-bound wording corrected in §5.
 
-- B1 `runner.py` day loop and status screen.
-- B2 start flow: region pick via region-explorer, spot, clan name.
-- B3 `main.py` entrypoint.
-- B4 subprocess integration tests.
+**Phase B — make it playable.** The terminal UI. **Done
+(2026-07-30).**
+
+- B1 `runner.py` day loop and status screen, plus the end-of-day report
+  and the planned-action list (both found by playing the WIP loop: the
+  screen used to clear straight from one day into the next, so events,
+  deaths and births were invisible, and a mis-picked zone could not be
+  taken back).
+- B2 start flow: region pick via region-explorer's `select_region`,
+  camp spot, clan name.
+- B3 `main.py` entrypoint. Ending a game deletes the save, or it would
+  stay resumable forever and replay its own ending on every launch.
+- B4 subprocess integration tests (`runner_test.py`, `main_test.py`).
 - B5 `furminal/README.md`.
 
 **Phase C — depth.** Optional, closes G4–G7. Only worth doing once
-Phase B proves the loop is fun.
+play proves the loop is fun.
 
 - C1 structure costs and effects.
 - C2 traits with mechanical weight.
 - C3 disposition consequences (raids when hostile).
 
-Phase A before Phase B is deliberate: building UI over a loop with no
-consumption and no ending would mean rewriting the screens once those
-land.
+Phase A before Phase B was deliberate: building UI over a loop with no
+consumption and no ending would have meant rewriting the screens once
+those landed.
+
+Two things Phase B surfaced for whoever picks up Phase C:
+
+- **A cat's status doesn't gate hunting.** A sick cat hunts as well as
+  a healthy one, and the runner offers it. Part of the same decorative
+  cluster as G5/G7.
+- **G8 is worked around, not closed.** `runner._patrol_targets` only
+  offers zones where a patrol will accomplish something, so the silent
+  no-op is unreachable from the UI. `advance_day`'s contract is still
+  inconsistent for any other caller.
