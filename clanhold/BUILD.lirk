@@ -1,0 +1,10 @@
+[[target]]
+name = "cats"
+type = "library"
+srcs = ["cats.py"]
+
+[[target]]
+name = "cats_test"
+type = "test"
+srcs = ["cats_test.py"]
+deps = [":cats"]
