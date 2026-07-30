@@ -1,4 +1,4 @@
-"""Simple periodic kit-birth chance for `clanhold` — not genetics.
+"""Simple periodic kit-birth chance for `furminal` — not genetics.
 
 A kit's name and single trait are drawn from the same pools
 `cats.py` uses for starting cats, with no inheritance from parents.

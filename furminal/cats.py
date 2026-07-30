@@ -1,4 +1,4 @@
-"""Cat data and starting-roster generation for `clanhold`.
+"""Cat data and starting-roster generation for `furminal`.
 
 Cat dict shape (JSON-serializable, part of `game_state["cats"]`):
     {

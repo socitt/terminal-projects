@@ -1,4 +1,4 @@
-"""Orchestrating module for `clanhold`: game_state shape, new_game, and
+"""Orchestrating module for `furminal`: game_state shape, new_game, and
 the daily advance_day seam that composes every other module.
 
 game_state dict shape (JSON-serializable, this is exactly what gets

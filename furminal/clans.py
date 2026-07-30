@@ -1,4 +1,4 @@
-"""The single neighboring clan for `clanhold`'s v1 scope.
+"""The single neighboring clan for `furminal`'s v1 scope.
 
 Not multi-clan diplomacy: one rival clan with a disposition value that
 drifts by a small random step each day, no player-driven diplomacy

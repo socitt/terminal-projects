@@ -1,4 +1,4 @@
-"""A small curated event table for `clanhold`.
+"""A small curated event table for `furminal`.
 
 Deliberately not a general event-authoring framework: a flat list of
 one-off flavor events with a tiny mechanical effect, no branching or

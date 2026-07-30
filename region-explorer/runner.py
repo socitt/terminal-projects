@@ -99,7 +99,7 @@ def run(state, sleep_fn=time.sleep):
 def select_region(state, sleep_fn=time.sleep):
     """Same overview/zoom browsing as `run()`, but for callers that
     need the player to actually settle on one region rather than just
-    browse until quitting (`clanhold`'s starting flow). Loops
+    browse until quitting (`furminal`'s starting flow). Loops
     overview -> zoom -> "Settle here?" until confirmed or the player
     quits from the overview. Returns the chosen region dict, or None
     on quit.

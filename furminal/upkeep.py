@@ -1,4 +1,4 @@
-"""Daily food/water upkeep for `clanhold`.
+"""Daily food/water upkeep for `furminal`.
 
 Closes gap G1 from `ARCHITECTURE.md` (no daily consumption) — before
 this module, `food`/`water` only ever rose. Every cat consumes food
@@ -6,7 +6,7 @@ and water each day; a store that falls short doesn't just clamp at 0,
 it picks a cat and makes them sick, or kills them if they're already
 sick. This is the only source of cat death in v1.
 
-Deliberately at L0 (no clanhold-internal imports, per `ARCHITECTURE.md`
+Deliberately at L0 (no furminal-internal imports, per `ARCHITECTURE.md`
 §2 rule 1) — operates on plain cat dicts by name, the same shape
 `cats.set_cat_status` uses, so `game.py` stays the only module that
 composes.

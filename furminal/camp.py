@@ -1,4 +1,4 @@
-"""Camp state for `clanhold`: a flat catalog of unlockable structures.
+"""Camp state for `furminal`: a flat catalog of unlockable structures.
 
 Per the v1 scope there is no building tree — each structure in
 `STRUCTURES` can be unlocked independently, with no prerequisites.

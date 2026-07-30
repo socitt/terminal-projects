@@ -47,7 +47,7 @@ inline in that part of the repo.
 - `adventure-engine/` — text adventure engine, with individual stories
   under `adventure-engine/stories/` (dungeon, train-mystery).
 - `region-explorer/` — WA state ASCII zoom map.
-- `clanhold/` — cat-clan colony sim (working title), builds on
+- `furminal/` — cat-clan colony sim (formerly `clanhold`), builds on
   `region-explorer`.
 - `docs/ACTIVE_SESSION.md` — running session log, used to resume work
   after a crash. If you're picking up an interrupted session, read this

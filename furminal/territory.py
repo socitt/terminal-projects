@@ -1,4 +1,4 @@
-"""Territory as a small named zone graph, per `clanhold`'s v1 design.
+"""Territory as a small named zone graph, per `furminal`'s v1 design.
 
 Deliberately a graph, not an x/y grid: each region-explorer region gets
 its own small zone graph (6-10 zones) generated fresh at game start.

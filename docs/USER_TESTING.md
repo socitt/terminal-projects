@@ -9,7 +9,8 @@ requests or polish, called out as such.
 
 Covered every playable target: all five `board-games/` entries and
 both `adventure-engine` story packs. `region-explorer` (no code yet)
-and `clanhold` (not started) were skipped as not testable.
+and `clanhold` (not started; renamed `furminal` on 2026-07-30) were
+skipped as not testable.
 
 ### Cross-cutting request: a computer opponent ("Nemo")
 

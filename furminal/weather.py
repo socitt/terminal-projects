@@ -1,4 +1,4 @@
-"""Simple rotating weather for `clanhold`.
+"""Simple rotating weather for `furminal`.
 
 Deliberately not a full simulation: each day's weather either persists
 or rolls over to a different state (`advance_weather`), and other

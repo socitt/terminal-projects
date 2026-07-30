@@ -1,4 +1,4 @@
-# clanhold — architecture
+# furminal — architecture
 
 Cat-clan colony sim. The player founds a clan in one `region-explorer`
 region, then plays day by day: patrol to claim territory, hunt and
@@ -52,7 +52,7 @@ in-game text, or identifiers.
  L1  population.py                → cats.py
       ├──────────────────────────────────────────────────────────────
  L0  cats  camp  territory  hunting  clans  weather  events  upkeep
-                                  no clanhold-internal dependencies
+                                  no furminal-internal dependencies
 ```
 
 Rules that hold today and must keep holding:
@@ -67,7 +67,7 @@ Rules that hold today and must keep holding:
 3. **Only L3+ does I/O.** No `print`, no `input`, no clock, no
    filesystem below `runner.py`. The one exception is
    `game.save_state`/`load_state`, which take an explicit path.
-4. **clanhold never imports `region-explorer` below L3.** `game_state`
+4. **furminal never imports `region-explorer` below L3.** `game_state`
    carries `region_id` as an opaque string tag. `game.py` neither
    validates it nor looks it up. Only the start flow in `runner.py`/
    `main.py` touches region-explorer at all.
@@ -77,9 +77,9 @@ Rules that hold today and must keep holding:
 ### Why `region_id` is opaque
 
 `region-explorer` owns *visual, gameplay-agnostic* region data
-(`region-explorer/data/washington.py`). clanhold layers its own zone
+(`region-explorer/data/washington.py`). furminal layers its own zone
 graph on top as *gameplay* data. Keeping the id opaque means new states
-can be added to region-explorer without touching clanhold, and clanhold
+can be added to region-explorer without touching furminal, and furminal
 can be tested without importing map data. This mirrors the existing
 `region-explorer/engine.py` vs `data/washington.py` split.
 
@@ -217,7 +217,7 @@ Enforced by tests; treat a break as a bug, not a design change.
   target extension, as separate commits.
 - **Build.** `lirk build //...` and `lirk test //...` from the repo
   root; the binary is `/root/git/lirk/bin/lirk`. Targets are declared in
-  `clanhold/BUILD.lirk`.
+  `furminal/BUILD.lirk`.
 
 ---
 
@@ -260,7 +260,7 @@ produces a game someone can finish. **Not started — next up.**
 - B2 start flow: region pick via region-explorer, spot, clan name.
 - B3 `main.py` entrypoint.
 - B4 subprocess integration tests.
-- B5 `clanhold/README.md`.
+- B5 `furminal/README.md`.
 
 **Phase C — depth.** Optional, closes G4–G7. Only worth doing once
 Phase B proves the loop is fun.

@@ -1,4 +1,4 @@
-"""Hunting/water-gathering resolution for `clanhold`.
+"""Hunting/water-gathering resolution for `furminal`.
 
 Per the v1 scope, ambient wildlife isn't a standalone ecosystem sim —
 it's folded directly into the outcome of a hunt: most hunts just yield

@@ -10,7 +10,7 @@ def _cat(name, status="healthy"):
 class _FakeRng:
     """Queue-based fake exposing `choice`, popping the next queued
     return value in call order (ignores the passed-in sequence, same
-    convention as the other `clanhold` test fakes)."""
+    convention as the other `furminal` test fakes)."""
 
     def __init__(self, choices):
         self._choices = list(choices)

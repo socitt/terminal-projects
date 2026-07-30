@@ -1,4 +1,4 @@
-"""Interactive clanhold day loop and status screen.
+"""Interactive furminal day loop and status screen.
 
 `run(state, save_path, rng=random)` is the day loop: render status,
 let the player queue any/all of a day's four optional actions
@@ -18,9 +18,9 @@ import random
 import sys
 from pathlib import Path
 
-_CLANHOLD_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_CLANHOLD_DIR))
-sys.path.insert(0, str(_CLANHOLD_DIR.parent))
+_FURMINAL_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_FURMINAL_DIR))
+sys.path.insert(0, str(_FURMINAL_DIR.parent))
 
 import camp
 import clans
@@ -29,7 +29,7 @@ import territory
 from shared import input as input_module
 from shared import term
 
-_REGION_EXPLORER_DIR = _CLANHOLD_DIR.parent / "region-explorer"
+_REGION_EXPLORER_DIR = _FURMINAL_DIR.parent / "region-explorer"
 
 _QUIT = object()
 
@@ -73,10 +73,10 @@ def start_flow(save_path, rng=random):
             return game.load_state(save_path)
 
     region_explorer_runner = _load_module(
-        "clanhold_region_explorer_runner", _REGION_EXPLORER_DIR / "runner.py"
+        "furminal_region_explorer_runner", _REGION_EXPLORER_DIR / "runner.py"
     )
     washington = _load_module(
-        "clanhold_region_explorer_washington",
+        "furminal_region_explorer_washington",
         _REGION_EXPLORER_DIR / "data" / "washington.py",
     )
     region = region_explorer_runner.select_region(washington.STATE)
