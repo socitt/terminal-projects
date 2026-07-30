@@ -41,3 +41,14 @@ name = "hunting_test"
 type = "test"
 srcs = ["hunting_test.py"]
 deps = [":hunting"]
+
+[[target]]
+name = "clans"
+type = "library"
+srcs = ["clans.py"]
+
+[[target]]
+name = "clans_test"
+type = "test"
+srcs = ["clans_test.py"]
+deps = [":clans"]
