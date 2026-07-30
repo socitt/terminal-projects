@@ -110,6 +110,7 @@ deps = [
     ":hunting",
     ":population",
     ":territory",
+    ":upkeep",
     ":weather",
 ]
 
@@ -117,4 +118,4 @@ deps = [
 name = "game_test"
 type = "test"
 srcs = ["game_test.py"]
-deps = [":game", ":camp", ":cats", ":clans", ":events", ":territory", ":weather"]
+deps = [":game", ":camp", ":cats", ":clans", ":events", ":territory", ":upkeep", ":weather"]
