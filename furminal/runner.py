@@ -3,19 +3,28 @@
 `run(state, save_path, rng=random)` is the day loop: render status,
 let the player queue any/all of a day's four optional actions
 (matching `game.advance_day`'s `actions` shape exactly -- each
-settable once per day), call `advance_day`, and repeat until
-`game.is_game_over` fires. `rng` is injectable (same reasoning as
-`region-explorer/runner.py`'s `sleep_fn`, per `ARCHITECTURE.md` §6's
-RNG-injection convention) so tests can drive a full playthrough
-deterministically instead of racing real randomness; `main.py` calls
-`run` with the default (the plain `random` module, same convention as
-`backgammon.roll_dice(random)`).
+settable once per day), call `advance_day`, show what the day did, and
+repeat until `game.is_game_over` fires. `rng` is injectable (same
+reasoning as `region-explorer/runner.py`'s `sleep_fn`, per
+`ARCHITECTURE.md` §6's RNG-injection convention) so tests can drive a
+full playthrough deterministically instead of racing real randomness;
+`main.py` calls `run` with the default (the plain `random` module, same
+convention as `backgammon.roll_dice(random)`).
+
+The day report is built by *diffing* the state before and after
+`advance_day` (`_day_report_lines`) rather than by having `advance_day`
+return a log. Every consequence the player needs to see is already
+recoverable from the two states, and the runner is the only layer that
+wants it, so this keeps the L2 contract in `ARCHITECTURE.md` §4
+unchanged and all player-facing phrasing in the one layer allowed to
+do I/O.
 """
 
 import importlib.util
 import os
 import random
 import sys
+import textwrap
 from pathlib import Path
 
 _FURMINAL_DIR = Path(__file__).resolve().parent
@@ -117,6 +126,96 @@ def _show_status(state):
         print("Camp: " + ", ".join(names))
 
 
+def _print_wrapped(text):
+    """Print `text` wrapped to the narrow-terminal width. Event text is
+    full prose sentences, the only place in this project where a line
+    routinely overruns `term.DEFAULT_WIDTH`."""
+    print(textwrap.fill(text, width=term.DEFAULT_WIDTH))
+
+
+def _day_report_lines(before, after):
+    """Return the lines describing what one `advance_day` did, in the
+    same order `advance_day` resolves them (`ARCHITECTURE.md` §4):
+    patrol results, then upkeep, recovery, weather, birth, event.
+
+    Deaths and status changes are read off the two rosters by name --
+    upkeep is the only thing that sickens or kills a cat and hunting is
+    the only thing that injures one, so a status change carries its own
+    explanation without `advance_day` having to report a cause.
+    """
+    lines = []
+
+    for zone_id, zone in after["zones"].items():
+        was = before["zones"][zone_id]
+        if zone["controlled"] and not was["controlled"]:
+            lines.append(f"{zone_id} is now clan territory.")
+        elif zone["explored"] and not was["explored"]:
+            lines.append(f"{zone_id} has been scouted.")
+
+    lines.append(
+        f"Food {before['food']} -> {after['food']}, "
+        f"water {before['water']} -> {after['water']}."
+    )
+
+    before_status = {cat["name"]: cat["status"] for cat in before["cats"]}
+    after_status = {cat["name"]: cat["status"] for cat in after["cats"]}
+
+    for name in before_status:
+        if name not in after_status:
+            lines.append(f"{name} has died.")
+        elif after_status[name] != before_status[name]:
+            if after_status[name] == "healthy":
+                lines.append(f"{name} has recovered.")
+            else:
+                lines.append(f"{name} is now {after_status[name]}.")
+
+    if after["weather"] != before["weather"]:
+        lines.append(f"The weather turns to {after['weather']}.")
+
+    for name in after_status:
+        if name not in before_status:
+            lines.append(f"A kit is born: {name}.")
+
+    for entry in after["event_log"][len(before["event_log"]):]:
+        lines.append(entry["text"])
+
+    return lines
+
+
+def _show_day_report(before, after):
+    """Show what the day just did, then wait, so the report isn't wiped
+    by the next day's status screen. Skipped entirely once the game is
+    over -- `run` prints the ending instead."""
+    if game.is_game_over(after):
+        return
+    term.clear_screen()
+    print(f"End of day {before['day']}")
+    print(term.hr())
+    for line in _day_report_lines(before, after):
+        _print_wrapped(line)
+    input_module.get_key("\nPress Enter to start the next day: ")
+
+
+def _planned_lines(actions):
+    """Return one short line per queued action, so the player can see
+    what the day already holds -- the status screen is redrawn (and the
+    terminal cleared) after every pick."""
+    lines = []
+    hunt = actions.get("hunt")
+    if hunt is not None:
+        lines.append(f"Hunt: {hunt['cat']} in {hunt['zone']}")
+    gather_water = actions.get("gather_water")
+    if gather_water is not None:
+        lines.append(f"Gather water: {gather_water['zone']}")
+    patrol = actions.get("patrol")
+    if patrol is not None:
+        lines.append(f"Patrol: {patrol['zone']}")
+    structure = actions.get("unlock_structure")
+    if structure is not None:
+        lines.append(f"Build: {camp.STRUCTURES[structure]['name']}")
+    return lines
+
+
 def _prompt_menu(prompt, options):
     """`options` is a list of (key, label) pairs. Prints them, prompts
     until one key is picked, and returns the chosen key."""
@@ -199,6 +298,13 @@ def _prompt_day_actions(state):
         patrol_targets = _patrol_targets(state)
         available_structures = _unlockable_structures(state)
 
+        planned = _planned_lines(actions)
+        if planned:
+            print(term.hr())
+            print("Planned today:")
+            for line in planned:
+                print(f"  {line}")
+
         options = []
         if "hunt" not in actions:
             options.append(("h", "Hunt"))
@@ -209,6 +315,8 @@ def _prompt_day_actions(state):
         if "unlock_structure" not in actions and available_structures:
             options.append(("u", "Unlock a structure"))
         options.append(("e", "End day"))
+        if planned:
+            options.append(("c", "Clear planned actions"))
         options.append(("s", "Save and quit"))
 
         print()
@@ -218,7 +326,9 @@ def _prompt_day_actions(state):
             return actions
         if key == "s":
             return _QUIT
-        if key == "h":
+        if key == "c":
+            actions = {}
+        elif key == "h":
             actions["hunt"] = _prompt_hunt(state)
         elif key == "g":
             actions["gather_water"] = _prompt_gather_water(state)
@@ -238,7 +348,9 @@ def run(state, save_path, rng=random):
             game.save_state(state, save_path)
             print("\nSaved. Run again to resume.")
             return state
-        state = game.advance_day(state, actions, rng)
+        next_state = game.advance_day(state, actions, rng)
+        _show_day_report(state, next_state)
+        state = next_state
 
     term.clear_screen()
     if game.outcome(state) == "won":
