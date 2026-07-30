@@ -19,3 +19,14 @@ name = "camp_test"
 type = "test"
 srcs = ["camp_test.py"]
 deps = [":camp"]
+
+[[target]]
+name = "territory"
+type = "library"
+srcs = ["territory.py"]
+
+[[target]]
+name = "territory_test"
+type = "test"
+srcs = ["territory_test.py"]
+deps = [":territory"]
