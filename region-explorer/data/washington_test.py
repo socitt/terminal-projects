@@ -9,6 +9,7 @@ from washington import STATE
 
 _MIN_WIDTH = 28
 _MAX_WIDTH = 39
+_MIN_ROWS = 6
 
 
 def _widths(grid):
@@ -43,6 +44,14 @@ class WashingtonDataTest(unittest.TestCase):
 
     def test_overview_width_matches_engine_display_cols_default(self):
         self.assertEqual(len(STATE["art"][0]), engine.DISPLAY_COLS)
+
+    def test_detail_art_height_within_narrow_terminal_target(self):
+        # detail_art renders raw (unscaled) as the final zoom frame, so it
+        # must not exceed the tallest animated crop (DISPLAY_ROWS) or the
+        # frame visibly grows taller right as the animation ends.
+        for region in STATE["regions"]:
+            rows = len(region["detail_art"])
+            self.assertTrue(_MIN_ROWS <= rows <= engine.DISPLAY_ROWS, region["id"])
 
     def test_every_region_has_at_least_one_landmark(self):
         for region in STATE["regions"]:
