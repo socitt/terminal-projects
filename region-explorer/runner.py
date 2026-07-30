@@ -37,7 +37,12 @@ def _show_overview(state):
     print("q. Quit")
 
 
-def _show_region(state, region, animate, sleep_fn):
+def _render_zoom(state, region, animate, sleep_fn):
+    """Render the zoom sequence (animated or straight to the final
+    frame) ending on `region`'s detail art and landmark list. Returns
+    nothing -- callers decide what prompt comes next, since `run()`'s
+    browse loop and `select_region()`'s pick-and-confirm flow want
+    different ones here."""
     frames = engine.zoom_frames(state, region["id"], num_frames=NUM_ZOOM_FRAMES)
     if animate:
         for frame in frames[:-1]:
@@ -52,7 +57,22 @@ def _show_region(state, region, animate, sleep_fn):
     print(term.hr())
     for landmark in region["landmarks"]:
         print(f"- {landmark}")
+
+
+def _show_region(state, region, animate, sleep_fn):
+    _render_zoom(state, region, animate, sleep_fn)
     input_module.get_key("\nPress Enter to go back to the overview: ")
+
+
+def _pick_region(state):
+    """Show the overview and prompt for a region choice. Returns the
+    chosen region dict, or None if the player quits."""
+    _show_overview(state)
+    valid_keys = [str(i) for i in range(1, len(state["regions"]) + 1)] + ["q"]
+    key = input_module.prompt_choice("> ", valid_keys)
+    if key == "q":
+        return None
+    return state["regions"][int(key) - 1]
 
 
 def run(state, sleep_fn=time.sleep):
@@ -65,15 +85,34 @@ def run(state, sleep_fn=time.sleep):
     delays against subprocess overhead.
     """
     while True:
-        _show_overview(state)
-        valid_keys = [str(i) for i in range(1, len(state["regions"]) + 1)] + ["q"]
-        key = input_module.prompt_choice("> ", valid_keys)
-        if key == "q":
+        region = _pick_region(state)
+        if region is None:
             return
 
-        region = state["regions"][int(key) - 1]
         animate = (
             input_module.prompt_choice("Play zoom animation? (y/n): ", ["y", "n"])
             == "y"
         )
         _show_region(state, region, animate, sleep_fn)
+
+
+def select_region(state, sleep_fn=time.sleep):
+    """Same overview/zoom browsing as `run()`, but for callers that
+    need the player to actually settle on one region rather than just
+    browse until quitting (`clanhold`'s starting flow). Loops
+    overview -> zoom -> "Settle here?" until confirmed or the player
+    quits from the overview. Returns the chosen region dict, or None
+    on quit.
+    """
+    while True:
+        region = _pick_region(state)
+        if region is None:
+            return None
+
+        animate = (
+            input_module.prompt_choice("Play zoom animation? (y/n): ", ["y", "n"])
+            == "y"
+        )
+        _render_zoom(state, region, animate, sleep_fn)
+        if input_module.prompt_choice("\nSettle here? (y/n): ", ["y", "n"]) == "y":
+            return region
