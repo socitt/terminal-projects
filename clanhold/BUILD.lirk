@@ -74,3 +74,15 @@ name = "events_test"
 type = "test"
 srcs = ["events_test.py"]
 deps = [":events"]
+
+[[target]]
+name = "population"
+type = "library"
+srcs = ["population.py"]
+deps = [":cats"]
+
+[[target]]
+name = "population_test"
+type = "test"
+srcs = ["population_test.py"]
+deps = [":population", ":cats"]
