@@ -189,6 +189,21 @@ class RunnerEndToEndTest(unittest.TestCase):
         self.assertEqual(saved["day"], 2)
         self.assertEqual(saved["camp"]["structures"], ["nursery"])
 
+    def test_ending_the_game_clears_the_save_file(self):
+        # Otherwise a save of a finished game stays resumable forever,
+        # replaying its own ending on every launch.
+        with open(self.save_path, "w") as f:
+            json.dump(_two_cat_state(), f)
+
+        result = _run(
+            repr(_two_cat_state()), "e\n", self.save_path,
+            extra_setup="game.SURVIVAL_GOAL_DAYS = 1",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("You win!", result.stdout)
+        self.assertFalse(self.save_path.exists())
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
     def test_clan_dying_out_shows_the_loss_message(self):
         # One already-"sick" cat with no food/water: the shortfall that
         # hits it on upkeep is a guaranteed death (rng.choice over a
@@ -317,6 +332,17 @@ class DayReportLinesTest(unittest.TestCase):
         self.assertEqual(
             runner._day_report_lines(before, after),
             ["Food 100 -> 98, water 100 -> 98."],
+        )
+
+    def test_warns_about_each_empty_store(self):
+        before, after = self._states(food=0, water=3)
+        lines = runner._day_report_lines(before, after)
+        self.assertIn("The food stores are empty.", lines)
+        self.assertNotIn("The water stores are empty.", lines)
+
+        before, after = self._states(food=3, water=0)
+        self.assertIn(
+            "The water stores are empty.", runner._day_report_lines(before, after)
         )
 
     def test_reports_death_sickness_and_recovery(self):
