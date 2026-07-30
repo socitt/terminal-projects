@@ -63,3 +63,14 @@ name = "weather_test"
 type = "test"
 srcs = ["weather_test.py"]
 deps = [":weather"]
+
+[[target]]
+name = "events"
+type = "library"
+srcs = ["events.py"]
+
+[[target]]
+name = "events_test"
+type = "test"
+srcs = ["events_test.py"]
+deps = [":events"]
