@@ -122,5 +122,77 @@ class RunnerEndToEndTest(unittest.TestCase):
         self.assertNotIn("Traceback", result.stdout + result.stderr)
 
 
+SELECT_REGION_FIXTURE_SCRIPT = textwrap.dedent(f"""
+    import sys
+    sys.path.insert(0, {str(RUNNER_DIR)!r})
+    import runner
+
+    state = {{
+        "name": "Fixtureland",
+        "art": [
+            "12345678",
+            "abcdefgh",
+            "ABCDEFGH",
+            "!@#$%^&*",
+        ],
+        "regions": [
+            {{
+                "id": "north",
+                "name": "Northern Reach",
+                "center": (0, 2),
+                "detail_art": ["NORTH DETAIL", "row two"],
+                "landmarks": ["The Frostpeak", "Icebound Lake"],
+            }},
+            {{
+                "id": "south",
+                "name": "Southern Marsh",
+                "center": (3, 5),
+                "detail_art": ["SOUTH DETAIL", "row two"],
+                "landmarks": ["The Mire", "Reed Village"],
+            }},
+        ],
+    }}
+
+    sleep_calls = []
+    picked = runner.select_region(state, sleep_fn=sleep_calls.append)
+    print(f"PICKED={{picked['id'] if picked else None}}")
+    """)
+
+
+class SelectRegionEndToEndTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fixture_path = Path(self.tmp.name) / "fixture_select.py"
+        self.fixture_path.write_text(SELECT_REGION_FIXTURE_SCRIPT)
+
+    def test_confirming_a_region_returns_it(self):
+        result = _run(self.fixture_path, "1\nn\ny\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("PICKED=north", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_declining_returns_to_overview_to_pick_again(self):
+        # Decline the first pick ("n" at "Settle here?"), then pick the
+        # other region and confirm it -- proves the loop actually
+        # returns to the overview rather than exiting on decline.
+        result = _run(self.fixture_path, "1\nn\nn\n2\nn\ny\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("PICKED=south", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_quitting_from_overview_returns_none(self):
+        result = _run(self.fixture_path, "q\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("PICKED=None", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_confirming_with_animation_still_returns_the_region(self):
+        result = _run(self.fixture_path, "2\ny\ny\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("PICKED=south", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
