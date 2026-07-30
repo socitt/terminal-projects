@@ -86,3 +86,24 @@ name = "population_test"
 type = "test"
 srcs = ["population_test.py"]
 deps = [":population", ":cats"]
+
+[[target]]
+name = "game"
+type = "library"
+srcs = ["game.py"]
+deps = [
+    ":camp",
+    ":cats",
+    ":clans",
+    ":events",
+    ":hunting",
+    ":population",
+    ":territory",
+    ":weather",
+]
+
+[[target]]
+name = "game_test"
+type = "test"
+srcs = ["game_test.py"]
+deps = [":game", ":camp", ":cats", ":clans", ":events", ":territory", ":weather"]
