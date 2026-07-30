@@ -1,7 +1,14 @@
 import random
 import unittest
 
-from cats import ROLES, TRAITS, cat_with_role, generate_starting_cats, new_cat
+from cats import (
+    ROLES,
+    TRAITS,
+    cat_with_role,
+    generate_starting_cats,
+    new_cat,
+    set_cat_status,
+)
 
 
 class _FakeRng:
@@ -98,6 +105,31 @@ class CatWithRoleTest(unittest.TestCase):
 
     def test_roles_constant_matches_usage(self):
         self.assertEqual(ROLES, ("leader", "healer"))
+
+
+class SetCatStatusTest(unittest.TestCase):
+    def test_updates_matching_cat(self):
+        cats = [new_cat("Ash", ["brave"]), new_cat("Willow", ["quick"])]
+        updated = set_cat_status(cats, "Ash", "injured")
+        self.assertEqual(updated[0]["status"], "injured")
+        self.assertEqual(updated[1]["status"], "healthy")
+
+    def test_does_not_mutate_input(self):
+        cats = [new_cat("Ash", ["brave"])]
+        set_cat_status(cats, "Ash", "injured")
+        self.assertEqual(cats[0]["status"], "healthy")
+
+    def test_no_op_when_name_not_found(self):
+        cats = [new_cat("Ash", ["brave"])]
+        updated = set_cat_status(cats, "Nobody", "injured")
+        self.assertEqual(updated, cats)
+
+    def test_preserves_other_fields(self):
+        cats = [new_cat("Ash", ["brave"], role="leader")]
+        updated = set_cat_status(cats, "Ash", "sick")
+        self.assertEqual(updated[0], {
+            "name": "Ash", "traits": ["brave"], "role": "leader", "status": "sick",
+        })
 
 
 if __name__ == "__main__":
