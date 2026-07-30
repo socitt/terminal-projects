@@ -1191,6 +1191,65 @@ day loop and terminal UI), and the starting flow that hooks into
 takes `region_id` as a plain argument and has no opinion on how it's
 chosen. No README yet either.
 
+## Also done (2026-07-30, same session): review pass + architecture doc
+
+After the logic layer landed, did a review pass over the whole
+`clanhold` suite rather than moving straight to the UI.
+
+**Test review** — found one real coverage hole and five tests that
+could not fail:
+- The hole: every `game_test` used `weather="clear"` (multiplier 1.0),
+  so `int(result[...] * multiplier)` could be deleted from
+  `advance_day` outright with all 21 tests still green. Now covered by
+  hunt/gather tests that run the same rng under "clear" vs "storm".
+- Removed as unfalsifiable: two tests asserting a constant equals its
+  own literal (`ROLES`, `WATER_TERRAIN` — `ROLES` was also dead code,
+  now actually used by `generate_starting_cats`); one comparing
+  `yield_multiplier` against the table it reads (replaced with a
+  bad-weather-yields-less invariant, which catches a zeroed storm
+  penalty where the old test did not); and the two
+  `test_triggers_roughly_at_expected_rate` tests in
+  `events`/`population`, which compared a measured rate against the
+  very constant under test — changing `EVENT_CHANCE` 0.15 -> 0.35
+  passed. 5000 rng iterations for no signal.
+- Added: injury lands on the acting cat, food clamped at 0 by a
+  negative event delta, `KeyError` on unknown zone, all four actions
+  composing in one `advance_day`, per-terrain water branch routing,
+  and two territory tests for contiguous outward expansion.
+- Net 91 -> 103 tests, and the suite got faster. Each added test was
+  verified against a targeted mutation.
+
+**`clanhold/ARCHITECTURE.md` added** — layering (L0-L4) and the four
+dependency rules, module contract table, `game_state` reference,
+invariants, conventions, gap analysis, roadmap. Written so the project
+can be picked up cold.
+
+**Gap analysis (verified against the code, not assumed):** several v1
+systems are inert — they carry state nothing reads. `disposition_tier`
+has no callers; camp structures and cat traits are never read outside
+their own modules; cat status is set but never consumed; `food` only
+ever increases. Concretely: **no daily consumption, no injury
+recovery, no end condition** (G1-G3), which is everything standing
+between the finished logic layer and a playable game. Structures are
+also free and inert (G4), traits/roles/disposition decorative
+(G5-G7), `patrol` fails silently where other actions raise (G8), and
+generated zone graphs are rings so expansion is a walk along a line
+(G9).
+
+**Roadmap set:** Phase A closes G1-G3 in pure logic (`upkeep.py`
+consumption, recovery + healer effect, `is_game_over`/`outcome`),
+Phase B is the terminal UI, Phase C is optional depth. **Phase A
+before Phase B deliberately** — building screens over a loop with no
+consumption and no ending would mean rewriting them once those land.
+This supersedes the "Next up" ordering written earlier in this
+session, which had the UI immediately next.
+
+One blocker found for Phase B and recorded in the task list:
+`region-explorer/runner.py`'s `run()` returns `None` — it is a
+browse-until-quit loop, not a picker, so it cannot be reused as-is to
+choose a starting region. Either add a `select_region` to it
+(recommended) or build a picker on `engine.py` primitives.
+
 ## Priority list status (2026-07-30, updated)
 
 1. `shared/` — **done**.
@@ -1198,10 +1257,12 @@ chosen. No README yet either.
 3. `adventure-engine` — **done**.
 4. `region-explorer` — **done**: overview + all 6 regions, zoom
    animation, mutation-verified engine/runner logic.
-5. `clanhold` — **game logic done** (all 8 modules + `game.py`,
-   mutation-verified, 60/60 targets clean); `runner.py`/`main.py`
-   (terminal UI, region-explorer-backed starting flow, save/resume
-   prompts) and `README.md` not started.
+5. `clanhold` — **logic layer done and reviewed** (all 8 modules +
+   `game.py`, mutation-verified, 60/60 targets clean, 103 tests);
+   `ARCHITECTURE.md` written. **Not yet playable** — Phase A (daily
+   consumption, recovery, end conditions) and Phase B (terminal UI,
+   region-explorer starting flow, README) both outstanding. See
+   `clanhold/ARCHITECTURE.md` §7-8 for the gap analysis and roadmap.
 
 ## Also outstanding (not part of the numbered build-order list)
 
@@ -1219,20 +1280,34 @@ them so a future session doesn't have to rediscover them by re-reading
 
 ## Next up
 
-- `clanhold/runner.py` + `main.py` — the interactive day loop (present
-  the day's state, take action input via `shared/input.py`, call
-  `game.advance_day`, loop) plus a starting flow that lets the player
-  pick a region via `region-explorer` (zoom UI) and a spot within it,
-  name the clan, then calls `game.new_game(rng, clan_name, region_id)`.
-  Save/resume prompts using `game.save_state`/`load_state`. Needs
-  integration tests (subprocess-based, same pattern as
-  `region-explorer/runner_test.py` and `main_test.py`) and a
-  `clanhold/README.md`. All 8 logic modules + `game.py` are done and
-  mutation-verified (see the 2026-07-30 entry above), so this is purely
-  UI/wiring work, no remaining game-logic design.
+**`clanhold` Phase A — make it a game** (pure logic, no UI; see
+`clanhold/ARCHITECTURE.md` §8 and the task list for full specs):
+
+- **A1** `clanhold/upkeep.py` — daily food/water consumption,
+  shortfall sickens cats. Closes G1, the reason there is currently no
+  survival pressure.
+- **A2** recovery in `cats.py` — injured/sick cats heal over time, at
+  better odds with a healthy healer alive. Closes G2 and gives the
+  healer role its first mechanical purpose.
+- **A3** `is_game_over(state)` / `outcome(state)` in `game.py`, plus
+  cat death (a sick cat hit by a repeat shortfall dies). Closes G3.
+  Note this breaks the current "cat count never decreases" invariant —
+  update `ARCHITECTURE.md` §5 and `AdvanceDayPropertyTest` with it.
+
+Then **Phase B** (terminal UI: `runner.py`, start flow, `main.py`,
+integration tests, README) and optionally **Phase C** (structure
+costs/effects, meaningful traits, disposition consequences).
+
+Phase B has one known blocker to resolve first:
+`region-explorer/runner.py`'s `run()` returns `None` and is a
+browse-until-quit loop, not a picker. Recommended fix is adding a
+`select_region(state, ...)` to it that returns the chosen region;
+region-explorer is a "done" project, so its 3 existing runner tests
+must stay green.
+
 - Alternatively, the `docs/USER_TESTING.md` items above (especially
   "Nemo") are an open, unstarted, user-requested backlog if priorities
-  shift before `clanhold`'s UI layer is picked up.
+  shift before `clanhold` is finished.
 
 ## Open questions
 
