@@ -8,3 +8,14 @@ name = "cats_test"
 type = "test"
 srcs = ["cats_test.py"]
 deps = [":cats"]
+
+[[target]]
+name = "camp"
+type = "library"
+srcs = ["camp.py"]
+
+[[target]]
+name = "camp_test"
+type = "test"
+srcs = ["camp_test.py"]
+deps = [":camp"]
