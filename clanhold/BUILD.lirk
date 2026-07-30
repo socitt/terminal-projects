@@ -30,3 +30,14 @@ name = "territory_test"
 type = "test"
 srcs = ["territory_test.py"]
 deps = [":territory"]
+
+[[target]]
+name = "hunting"
+type = "library"
+srcs = ["hunting.py"]
+
+[[target]]
+name = "hunting_test"
+type = "test"
+srcs = ["hunting_test.py"]
+deps = [":hunting"]
