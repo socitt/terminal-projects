@@ -46,18 +46,35 @@ import weather
 
 STARTING_FOOD = 5
 STARTING_WATER = 5
+CAMP_SPOT_CHOICES = 3
 
 
-def new_game(rng, clan_name, region_id):
+def generate_camp_spots(rng, count=CAMP_SPOT_CHOICES):
+    """Return `count` candidate zone graphs for the start flow to offer
+    as camp spots, one of which comes back as `new_game`'s `zones`.
+
+    Here rather than in the runner so game_state is still only ever
+    assembled at L2 (`ARCHITECTURE.md` §2 rule 2) — the runner's job is
+    to describe the candidates and take the player's pick.
+    """
+    return [territory.generate_zone_graph(rng) for _ in range(count)]
+
+
+def new_game(rng, clan_name, region_id, zones=None):
     """Return a freshly founded game_state for `clan_name` settling in
-    region `region_id` (an opaque region-explorer region id)."""
+    region `region_id` (an opaque region-explorer region id).
+
+    `zones` is the chosen camp spot: pass one of `generate_camp_spots`'
+    graphs to found the clan there, or leave it None to generate one
+    (which every test that doesn't care about the spot does).
+    """
     return {
         "clan_name": clan_name,
         "region_id": region_id,
         "day": 1,
         "cats": cats.generate_starting_cats(rng),
         "camp": camp.new_camp(),
-        "zones": territory.generate_zone_graph(rng),
+        "zones": territory.generate_zone_graph(rng) if zones is None else zones,
         "other_clans": [clans.generate_neighbor_clan(rng)],
         "weather": rng.choice(weather.WEATHER_STATES),
         "food": STARTING_FOOD,
