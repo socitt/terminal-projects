@@ -11,10 +11,12 @@ import territory
 import upkeep
 import weather
 from game import (
+    CAMP_SPOT_CHOICES,
     STARTING_FOOD,
     STARTING_WATER,
     SURVIVAL_GOAL_DAYS,
     advance_day,
+    generate_camp_spots,
     is_game_over,
     load_state,
     new_game,
@@ -99,6 +101,42 @@ class NewGameTest(unittest.TestCase):
 
             self.assertEqual(len(state["other_clans"]), 1)
             self.assertTrue(-20 <= state["other_clans"][0]["disposition"] <= 20)
+
+    def test_founds_the_clan_on_a_chosen_camp_spot(self):
+        spot = {
+            "home": territory.new_zone(
+                "home", "riverbank", adjacent=[], explored=True, controlled=True
+            ),
+        }
+        state = new_game(random.Random(0), "Test Clan", "olympic", zones=spot)
+        self.assertEqual(state["zones"], spot)
+
+    def test_generates_a_spot_when_none_is_chosen(self):
+        state = new_game(random.Random(0), "Test Clan", "olympic")
+        self.assertIn(len(state["zones"]), range(6, 11))
+
+
+class GenerateCampSpotsTest(unittest.TestCase):
+    def test_returns_the_requested_number_of_playable_graphs(self):
+        spots = generate_camp_spots(random.Random(0), count=4)
+
+        self.assertEqual(len(spots), 4)
+        for zones in spots:
+            self.assertIn(len(zones), range(6, 11))
+            self.assertTrue(zones["home"]["explored"])
+            self.assertTrue(zones["home"]["controlled"])
+
+    def test_defaults_to_camp_spot_choices(self):
+        self.assertEqual(len(generate_camp_spots(random.Random(0))), CAMP_SPOT_CHOICES)
+
+    def test_spots_are_drawn_independently(self):
+        # Distinct graphs, not one graph handed back N times — the whole
+        # point is that the player has something to choose between.
+        spots = generate_camp_spots(random.Random(1), count=5)
+        summaries = {
+            (len(zones), zones["home"]["terrain"]) for zones in spots
+        }
+        self.assertGreater(len(summaries), 1)
 
 
 class AdvanceDayQuietDayTest(unittest.TestCase):
