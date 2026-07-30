@@ -91,6 +91,27 @@ class ResolveUpkeepShortfallTest(unittest.TestCase):
         by_name = {c["name"]: c["status"] for c in result["cats"]}
         self.assertEqual(by_name, {"Ash": "sick", "Willow": "sick"})
 
+    def test_one_shortfall_kills_only_the_chosen_cat(self):
+        # Being "sick" is not itself fatal — only the cat the shortfall
+        # actually picks dies. Water is covered here so exactly one
+        # shortfall resolves.
+        cats = [_cat("Ash", status="sick"), _cat("Willow", status="sick")]
+        result = resolve_upkeep(
+            cats, food=0, water=10, rng=_FakeRng([_cat("Ash")]),
+        )
+        self.assertEqual([c["name"] for c in result["cats"]], ["Willow"])
+
+    def test_both_shortfalls_can_kill_two_sick_cats_in_one_day(self):
+        # The worst case the roster bound in ARCHITECTURE.md §5 has to
+        # allow for: food and water shortfalls resolve independently,
+        # so a day can cost two cats, not one.
+        cats = [_cat("Ash", status="sick"), _cat("Willow", status="sick")]
+        result = resolve_upkeep(
+            cats, food=0, water=0,
+            rng=_FakeRng([_cat("Ash"), _cat("Willow")]),
+        )
+        self.assertEqual(result["cats"], [])
+
     def test_shortfall_can_empty_the_roster(self):
         cats = [_cat("Ash", status="sick")]
         result = resolve_upkeep(cats, food=0, water=10, rng=_FakeRng([_cat("Ash")]))

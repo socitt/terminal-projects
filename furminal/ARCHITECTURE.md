@@ -182,9 +182,10 @@ Enforced by tests; treat a break as a bug, not a design change.
 - `day` increases by exactly 1 per call.
 - `food`/`water` never go negative (clamped at 0).
 - **Cat count can now decrease.** A food or water shortfall during
-  upkeep kills a cat that was already "sick" (see `upkeep.py`). It can
-  never drop below 0, and at most one kit is added per day, so
-  `0 <= len(next_cats) <= len(cats) + 1` always holds.
+  upkeep kills a cat that was already "sick" (see `upkeep.py`). Food
+  and water shortfalls resolve independently, so a single day costs at
+  most two cats, and at most one kit is added, giving
+  `len(cats) - 2 <= len(next_cats) <= len(cats) + 1`.
 - Zone ids are stable: `advance_day` never adds or removes zones.
 - Territory grows contiguously: a zone is explorable only when adjacent
   to an explored zone, claimable only when explored *and* adjacent to a

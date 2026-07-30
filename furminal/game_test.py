@@ -352,7 +352,9 @@ class AdvanceDayPropertyTest(unittest.TestCase):
         already-"sick" cat on a shortfall) — every 5th seed starts with
         a sick leader and low food/water specifically to exercise that
         path here rather than assume it, matching upkeep_test.py's
-        direct coverage of the same rule."""
+        direct coverage of the same rule. The lower bound is
+        `len(cats) - 2`, not `0`: food and water shortfalls resolve
+        independently, so one day can cost at most two cats."""
         for seed in range(100):
             rng = random.Random(seed)
             state = _fixture_state(
@@ -371,7 +373,7 @@ class AdvanceDayPropertyTest(unittest.TestCase):
             self.assertEqual(updated["day"], state["day"] + 1)
             self.assertGreaterEqual(updated["food"], 0)
             self.assertGreaterEqual(updated["water"], 0)
-            self.assertGreaterEqual(len(updated["cats"]), 0)
+            self.assertGreaterEqual(len(updated["cats"]), len(state["cats"]) - 2)
             self.assertLessEqual(len(updated["cats"]), len(state["cats"]) + 1)
             self.assertEqual(set(updated["zones"]), set(state["zones"]))
             self.assertEqual(len(updated["other_clans"]), len(state["other_clans"]))
