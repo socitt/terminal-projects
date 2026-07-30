@@ -1309,6 +1309,98 @@ must stay green.
   "Nemo") are an open, unstarted, user-requested backlog if priorities
   shift before `clanhold` is finished.
 
+## Done (2026-07-30, new session): `clanhold` Phase A — make it a game
+
+Picked up exactly where the prior session's roadmap left off (G1-G3,
+`ARCHITECTURE.md` §8). Same per-file commit discipline, mutation-tested
+before considering each piece done.
+
+- **A1 `upkeep.py`** — daily food/water consumption (`FOOD_PER_CAT`/
+  `WATER_PER_CAT` = 1 each). A shortfall (store doesn't cover every cat)
+  picks one cat via `rng.choice`: already-"sick" dies, anything else
+  becomes "sick". Food and water shortfalls resolved independently, can
+  hit the same or different cats. Deliberately kept at L0 (operates on
+  cat dicts by name, no `cats.py` import) so `game.py` stays the only
+  composing module, per the `ARCHITECTURE.md` §2 layering rule. 11
+  tests, 3/3 injected mutations caught (shortfall detection disabled,
+  sick-cat death skipped, clamping removed). Committed `6e62395`,
+  `0c1636f`, `0c554f7`.
+- **A2 recovery** — `cats.maybe_recover(cats, rng)`: each non-"healthy"
+  cat independently rolls `RECOVERY_CHANCE` (0.3), boosted by
+  `HEALER_RECOVERY_BONUS` (+0.3) if a *healthy* healer is present (a
+  healer who is themselves down doesn't tend anyone). First mechanical
+  effect the healer role has ever had (G2, part of G7). 7 new tests,
+  3/3 mutations caught (healer bonus disabled, healthy-cat guard
+  dropped, sick-healer-still-counts). Committed `c140b4e`, `aa3ff79`.
+- **A3 wiring + end conditions** — `advance_day` now runs
+  `upkeep.resolve_upkeep` then `cats.maybe_recover` after the four
+  player actions and before disposition drift/weather/kit-birth/event
+  (so same-day hunting food counts toward upkeep, and a same-day injury
+  gets one recovery roll before the day ends). Added
+  `game.outcome(state)`/`game.is_game_over(state)`: `"lost"` when the
+  clan dies out (checked first), `"won"` past `SURVIVAL_GOAL_DAYS`
+  (picked 20, arbitrary but reasonable for v1 — easy to retune, it's a
+  plain module constant), `None` while ongoing.
+
+  This breaks the "cat count never decreases" invariant on purpose (a
+  shortfall can now kill an already-sick cat) — updated
+  `ARCHITECTURE.md` §5 to the new bound (`0 <= len(next_cats) <=
+  len(cats) + 1`) and reworked `AdvanceDayPropertyTest` to actually
+  exercise the death path (variable starting food/water, a sick leader
+  on every 5th seed) rather than assume the old invariant still held.
+  Every existing food/water assertion in `game_test.py` needed updating
+  for upkeep's per-cat consumption; a few hunt tests needed an extra
+  forced-fail recovery roll inserted so a same-day injury survived to
+  the assertion instead of self-healing before the test could check it.
+  Added `AdvanceDayUpkeepIntegrationTest` (the seam firing inside
+  `advance_day`, not just `upkeep.py` standalone) and `OutcomeTest`
+  (including lost-beats-won on a simultaneous day). 4/4 injected
+  mutations caught (upkeep result dropped, recovery step skipped,
+  "lost" check removed, survival-day off-by-one). Committed `c6702a8`,
+  `91d353f`, `d2ba5fc`.
+
+**Full-repo confirmation:** `lirk build //...` — 62/62 targets clean.
+`lirk test //...` — 30/30 tests pass, 3x fresh-shell with
+`.lirk-cache.json` cleared. Standalone `python3 -m unittest` also run
+per-module throughout, same as every prior session.
+
+**`clanhold/ARCHITECTURE.md` updated in place**: module contract table
+(`upkeep.py` row, `cats.py`/`game.py` entries extended), L0 layer
+diagram, `advance_day`'s order-of-resolution (steps 5-6 added, with the
+same-day-injury/same-day-food notes above), a new `is_game_over`/
+`outcome` subsection, the cat-count invariant, and the gap table (G1-G3
+marked closed, G7 updated to reflect the healer's new effect). Phase A
+marked done in the roadmap.
+
+## Priority list status (2026-07-30, updated again)
+
+5. `clanhold` — **Phase A done** (G1-G3 closed: daily upkeep, healer
+   recovery, win/lose conditions). Phase B (terminal UI, region-explorer
+   starting flow, README) is next, per `ARCHITECTURE.md` §8. Phase B's
+   known blocker is unchanged from the last session: `region-explorer/
+   runner.py`'s `run()` is a browse-until-quit loop, not a picker —
+   still needs a `select_region(...)` (or an `engine.py`-primitives-based
+   picker) before the start flow can use it, and region-explorer's own
+   3 runner tests must stay green through that change.
+
+## Next up
+
+**`clanhold` Phase B — make it playable** (terminal UI; see
+`ARCHITECTURE.md` §8 for the outline):
+
+- B1 `runner.py` day loop and status screen.
+- B2 start flow: region pick via region-explorer, spot, clan name.
+  Resolve the `select_region` blocker above first.
+- B3 `main.py` entrypoint.
+- B4 subprocess integration tests (`main_test.py`, same pattern as every
+  other project's — see the board-games/adventure-engine/region-explorer
+  sessions above).
+- B5 `clanhold/README.md`.
+
+Phase C (structure costs/effects, meaningful traits, disposition
+consequences) is optional and only worth doing once Phase B proves the
+loop is fun — see `ARCHITECTURE.md` §8.
+
 ## Open questions
 
 - None beyond the SIGHUP blocker above (now tracked in
