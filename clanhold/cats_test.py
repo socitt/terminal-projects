@@ -2,27 +2,34 @@ import random
 import unittest
 
 from cats import (
+    HEALER_RECOVERY_BONUS,
+    RECOVERY_CHANCE,
     TRAITS,
     cat_with_role,
     generate_starting_cats,
+    maybe_recover,
     new_cat,
     set_cat_status,
 )
 
 
 class _FakeRng:
-    """Queue-based fake exposing `choice`/`sample`, each call popping the
-    next queued return value in call order."""
+    """Queue-based fake exposing `choice`/`sample`/`random`, each call
+    popping the next queued return value in call order."""
 
-    def __init__(self, choices, samples):
+    def __init__(self, choices=(), samples=(), randoms=()):
         self._choices = list(choices)
         self._samples = list(samples)
+        self._randoms = list(randoms)
 
     def choice(self, seq):
         return self._choices.pop(0)
 
     def sample(self, seq, k):
         return self._samples.pop(0)
+
+    def random(self):
+        return self._randoms.pop(0)
 
 
 class NewCatTest(unittest.TestCase):
@@ -126,6 +133,58 @@ class SetCatStatusTest(unittest.TestCase):
         self.assertEqual(updated[0], {
             "name": "Ash", "traits": ["brave"], "role": "leader", "status": "sick",
         })
+
+
+class MaybeRecoverTest(unittest.TestCase):
+    def test_recovers_below_threshold(self):
+        cats = [new_cat("Ash", ["brave"], status="sick")]
+        rng = _FakeRng(randoms=[RECOVERY_CHANCE - 0.01])
+        updated = maybe_recover(cats, rng)
+        self.assertEqual(updated[0]["status"], "healthy")
+
+    def test_stays_sick_above_threshold(self):
+        cats = [new_cat("Ash", ["brave"], status="sick")]
+        rng = _FakeRng(randoms=[RECOVERY_CHANCE + 0.01])
+        updated = maybe_recover(cats, rng)
+        self.assertEqual(updated[0]["status"], "sick")
+
+    def test_healthy_cats_never_roll(self):
+        cats = [new_cat("Ash", ["brave"], status="healthy")]
+        updated = maybe_recover(cats, _FakeRng(randoms=[]))
+        self.assertEqual(updated[0]["status"], "healthy")
+
+    def test_healer_present_and_healthy_boosts_chance(self):
+        cats = [
+            new_cat("Ash", ["brave"], status="injured"),
+            new_cat("Willow", ["quick"], role="healer", status="healthy"),
+        ]
+        boosted_threshold = RECOVERY_CHANCE + HEALER_RECOVERY_BONUS - 0.01
+        rng = _FakeRng(randoms=[boosted_threshold])
+        updated = maybe_recover(cats, rng)
+        self.assertEqual(updated[0]["status"], "healthy")
+
+    def test_sick_healer_gives_no_bonus(self):
+        cats = [
+            new_cat("Ash", ["brave"], status="injured"),
+            new_cat("Willow", ["quick"], role="healer", status="sick"),
+        ]
+        rng = _FakeRng(randoms=[RECOVERY_CHANCE + 0.01, 1.0])
+        updated = maybe_recover(cats, rng)
+        by_name = {c["name"]: c["status"] for c in updated}
+        self.assertEqual(by_name["Ash"], "injured")
+
+    def test_does_not_mutate_input(self):
+        cats = [new_cat("Ash", ["brave"], status="sick")]
+        maybe_recover(cats, _FakeRng(randoms=[0.0]))
+        self.assertEqual(cats[0]["status"], "sick")
+
+    def test_never_adds_or_removes_cats(self):
+        cats = [
+            new_cat("Ash", ["brave"], status="sick"),
+            new_cat("Willow", ["quick"], status="healthy"),
+        ]
+        updated = maybe_recover(cats, _FakeRng(randoms=[1.0]))
+        self.assertEqual(len(updated), 2)
 
 
 if __name__ == "__main__":
