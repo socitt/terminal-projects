@@ -66,12 +66,35 @@ def _prompt_clan_name():
             return name
 
 
+def _spot_summary(zones):
+    """One narrow line describing a candidate camp spot: the terrain the
+    camp itself sits on, how much ground there is to claim, and what it
+    borders. Terrain is the whole of the choice -- it drives hunting and
+    water yields (see `hunting.FOOD_YIELD`/`WATER_TERRAIN`)."""
+    home = zones["home"]
+    borders = ", ".join(zones[adj]["terrain"] for adj in home["adjacent"])
+    return f"{home['terrain']} ({len(zones)} zones, borders {borders})"
+
+
+def _prompt_camp_spot(rng):
+    """Offer `game.generate_camp_spots`' candidates and return the
+    chosen zone graph -- the "pick a spot" step of the start flow, after
+    the region and before naming the clan."""
+    spots = game.generate_camp_spots(rng)
+    print("\nWhere does the clan make camp?")
+    for i, zones in enumerate(spots, start=1):
+        print(f"{i}. {_spot_summary(zones)}")
+    keys = [str(i) for i in range(1, len(spots) + 1)]
+    key = input_module.prompt_choice("> ", keys)
+    return spots[int(key) - 1]
+
+
 def start_flow(save_path, rng=random):
     """Resolve the game_state to start playing with: resume from
     `save_path` if it exists and the player wants to, otherwise run
-    region-explorer's region picker and clan naming, then found a new
-    clan via `game.new_game`. Returns None if the player backs out of
-    region selection without settling on one (see
+    region-explorer's region picker, pick a camp spot within it, name
+    the clan, and found it via `game.new_game`. Returns None if the
+    player backs out of region selection without settling on one (see
     `region_explorer_runner.select_region`) -- there is no clan to
     play without a region.
     """
@@ -92,9 +115,11 @@ def start_flow(save_path, rng=random):
     if region is None:
         return None
 
+    zones = _prompt_camp_spot(rng)
+
     print()
     clan_name = _prompt_clan_name()
-    return game.new_game(rng, clan_name, region["id"])
+    return game.new_game(rng, clan_name, region["id"], zones=zones)
 
 
 def _show_status(state):

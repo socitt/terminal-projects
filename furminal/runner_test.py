@@ -204,6 +204,54 @@ class RunnerEndToEndTest(unittest.TestCase):
         self.assertNotIn("Traceback", result.stdout + result.stderr)
 
 
+class StartFlowTest(unittest.TestCase):
+    """The region-pick half of the start flow needs region-explorer's
+    whole zoom UI driven through it, so it is covered end-to-end in
+    main_test.py against the real entrypoint. Here: the resume branch,
+    which never reaches region-explorer, and the pure spot summary."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.save_path = Path(self.tmp.name) / "save.json"
+
+    def test_resumes_from_an_existing_save_when_asked(self):
+        saved = _two_cat_state()
+        saved["day"] = 7
+        with open(self.save_path, "w") as f:
+            json.dump(saved, f)
+
+        script = _FIXTURE_PREAMBLE + textwrap.dedent(f"""
+            state = runner.start_flow({str(self.save_path)!r})
+            print("RESUMED_DAY", state["day"])
+            """)
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+            f.write(script)
+            script_path = f.name
+        result = subprocess.run(
+            [sys.executable, script_path], input="y\n",
+            capture_output=True, text=True, timeout=15,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RESUMED_DAY 7", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_spot_summary_names_the_terrain_size_and_borders(self):
+        zones = {
+            "home": {"id": "home", "terrain": "meadow",
+                     "adjacent": ["a", "b"], "explored": True, "controlled": True},
+            "a": {"id": "a", "terrain": "riverbank", "adjacent": ["home"],
+                  "explored": False, "controlled": False},
+            "b": {"id": "b", "terrain": "ridge", "adjacent": ["home"],
+                  "explored": False, "controlled": False},
+        }
+        self.assertEqual(
+            runner._spot_summary(zones),
+            "meadow (3 zones, borders riverbank, ridge)",
+        )
+
+
 class DayReportEndToEndTest(unittest.TestCase):
     """The report screen itself: that it renders between days, and that
     a triggered event reaches the player rather than only `event_log`."""
