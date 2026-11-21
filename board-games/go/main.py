@@ -2,6 +2,9 @@
 (single key + Enter, no arrow/modifier chords). Coordinates are
 entered as two single-digit prompts (column, then row) rather than
 one combined token, for the same reason.
+
+The game opens by asking for an opponent: a second human on the same
+screen, or Nemo (nemo/) at one of three levels. Nemo plays White.
 """
 
 import sys
@@ -9,10 +12,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from nemo import ui as nemo_ui
 from shared import input as input_module
 from shared import term
 
-from board import BLACK, SIZE, apply_move, opponent, new_board, score, winner
+import nemo_adapter
+from board import BLACK, SIZE, WHITE, apply_move, opponent, new_board, score, winner
+
+NEMO_COLOR = WHITE
 
 DIGIT_KEYS = [str(d) for d in range(1, SIZE + 1)]
 COLUMN_KEYS = DIGIT_KEYS + ["p"]
@@ -28,14 +35,36 @@ def render(board):
 
 
 def main():
+    level = nemo_ui.prompt_opponent()
+    rng = nemo_ui.make_rng()
     board = new_board()
     previous_board = None
     turn = BLACK
     consecutive_passes = 0
+    notes = []
 
     while consecutive_passes < 2:
         term.clear_screen()
         print(render(board))
+        for line in notes:
+            print(line)
+        notes = []
+
+        if level is not nemo_ui.HUMAN and turn == NEMO_COLOR:
+            state = (board, turn, previous_board, consecutive_passes)
+            move, notes = nemo_ui.take_turn(nemo_adapter, state, level, rng)
+            if move == nemo_adapter.PASS:
+                consecutive_passes += 1
+                notes = notes + ["Nemo passed"]
+            else:
+                row, col = move
+                previous_board = board
+                board = apply_move(board, row, col, turn, previous_board)
+                consecutive_passes = 0
+                notes = notes + [f"Nemo played column {col + 1}, row {row + 1}"]
+            turn = opponent(turn)
+            continue
+
         print(f"\n{turn}'s turn")
         col_key = input_module.prompt_choice("Column (1-9) or P to pass: ", COLUMN_KEYS)
 
@@ -61,6 +90,8 @@ def main():
 
     term.clear_screen()
     print(render(board))
+    for line in notes:
+        print(line)
     black_score, white_score = score(board)
     print(f"\nBlack: {black_score}  White: {white_score}")
     result = winner(board)

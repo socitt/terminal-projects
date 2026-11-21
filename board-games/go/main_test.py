@@ -7,6 +7,7 @@ Both scenarios below were validated interactively (manual piped-input
 runs, output inspected by hand) before being encoded here.
 """
 
+import os
 import subprocess
 import sys
 import unittest
@@ -15,13 +16,17 @@ from pathlib import Path
 MAIN = Path(__file__).resolve().parent / "main.py"
 
 
-def _run(input_text, timeout=10):
+def _run(input_text, timeout=10, opponent="0", seed="1"):
+    """`opponent` answers main.py's opening prompt: "0" for a second
+    human (every scenario written before Nemo existed), "1"-"3" for
+    Nemo, whose choices TP_NEMO_SEED makes repeatable."""
     return subprocess.run(
         [sys.executable, str(MAIN)],
-        input=input_text,
+        input=f"{opponent}\n{input_text}",
         capture_output=True,
         text=True,
         timeout=timeout,
+        env={**os.environ, "TP_NEMO_SEED": seed},
     )
 
 
@@ -49,6 +54,23 @@ class MainEndToEndTest(unittest.TestCase):
         self.assertIn("Black: 4  White: 6.5", result.stdout)
         self.assertIn("W wins!", result.stdout)
         self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+
+class NemoEndToEndTest(unittest.TestCase):
+    def test_hard_nemo_passes_to_win_on_komi(self):
+        result = _run("p\n", opponent="3")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Nemo passed", result.stdout)
+        self.assertIn("W wins!", result.stdout)
+
+    def test_hard_nemo_answers_a_stone_then_passes_once_ahead(self):
+        # After one stone each the empty board borders both colours, so
+        # it's neutral and komi wins it for White: Nemo stops there.
+        for seed in ("1", "2", "3"):
+            result = _run("5\n5\n" + "p\n" * 20, opponent="3", seed=seed)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.count("Nemo played"), 1)
+            self.assertIn("W wins!", result.stdout)
 
 
 if __name__ == "__main__":
