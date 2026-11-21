@@ -10,6 +10,7 @@ import events
 import territory
 import upkeep
 import weather
+import game
 from game import (
     CAMP_SPOT_CHOICES,
     STARTING_FOOD,
@@ -51,8 +52,11 @@ def _fixture_state(**overrides):
         "region_id": "olympic",
         "day": 5,
         "cats": [
-            cats.new_cat("Ash", ["brave"], role="leader"),
-            cats.new_cat("Willow", ["quick"], role="healer"),
+            # Flavour-only traits (no entry in data/traits.json), so the
+            # tests written before Phase C still test what they say.
+            # Trait effects are pinned in AdvanceDayPhaseCTest.
+            cats.new_cat("Ash", ["curious"], role="leader"),
+            cats.new_cat("Willow", ["playful"], role="healer"),
         ],
         "camp": camp.new_camp(),
         "zones": {
@@ -273,11 +277,18 @@ class AdvanceDayPatrolTest(unittest.TestCase):
 
 
 class AdvanceDayUnlockStructureTest(unittest.TestCase):
-    def test_unlocks_structure(self):
-        state = _fixture_state()
+    def test_unlocks_structure_and_pays_its_cost(self):
+        state = _fixture_state(food=10)
         rng = _FakeRng(randoms=list(_QUIET_RANDOMS), randints=list(_QUIET_RANDINTS))
         updated = advance_day(state, {"unlock_structure": "nursery"}, rng)
         self.assertEqual(updated["camp"]["structures"], ["nursery"])
+        self.assertEqual(updated["food"],
+                         10 - game.structure_cost("nursery") - 2 * upkeep.FOOD_PER_CAT)
+
+    def test_raises_when_the_clan_cannot_afford_it(self):
+        state = _fixture_state(food=game.structure_cost("nursery") - 1)
+        with self.assertRaisesRegex(ValueError, "not enough food"):
+            advance_day(state, {"unlock_structure": "nursery"}, random.Random(0))
 
     def test_raises_for_unknown_structure(self):
         state = _fixture_state()
@@ -369,7 +380,8 @@ class AdvanceDayCombinedActionsTest(unittest.TestCase):
             "unlock_structure": "nursery",
         }, rng)
 
-        self.assertEqual(updated["food"], 8 - 2 * upkeep.FOOD_PER_CAT)
+        self.assertEqual(updated["food"],
+                         8 - game.structure_cost("nursery") - 2 * upkeep.FOOD_PER_CAT)
         self.assertEqual(updated["water"], 9 - 2 * upkeep.WATER_PER_CAT)
         self.assertTrue(updated["zones"]["a"]["controlled"])
         self.assertEqual(updated["camp"]["structures"], ["nursery"])
@@ -383,6 +395,94 @@ class AdvanceDayDispositionTest(unittest.TestCase):
         updated = advance_day(state, {}, rng)
         self.assertEqual(updated["other_clans"][0]["disposition"], 7)
 
+
+class AdvanceDayPhaseCTest(unittest.TestCase):
+    """Phase C (G4-G7): each table-driven effect, through advance_day.
+    Roll order: hunt, recovery (per non-healthy cat), drift, weather,
+    birth, event, then the border roll (hostile/friendly rivals only)."""
+
+    def _leader(self, traits, status="healthy"):
+        return cats.new_cat("Ash", traits, role="leader", status=status)
+
+    def _healer(self, traits=("playful",)):
+        return cats.new_cat("Willow", list(traits), role="healer")
+
+    def test_a_keen_eyed_hunter_brings_back_one_more(self):
+        state = _fixture_state(cats=[self._leader(["keen-eyed"]), self._healer()])
+        rng = _FakeRng(randoms=[0.5] + _QUIET_RANDOMS, randints=[3, 0])
+        updated = advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)
+        self.assertEqual(updated["food"], 5 + 4 - 2 * upkeep.FOOD_PER_CAT)
+
+    def test_a_hunter_who_isnt_healthy_brings_back_half(self):
+        state = _fixture_state(cats=[self._leader(["curious"], "sick"), self._healer()])
+        rng = _FakeRng(randoms=[0.5, 0.99] + _QUIET_RANDOMS, randints=[3, 0])
+        updated = advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)
+        self.assertEqual(updated["food"], 5 + 1 - 2 * upkeep.FOOD_PER_CAT)
+
+    def test_a_cautious_hunter_is_never_injured(self):
+        state = _fixture_state(cats=[self._leader(["cautious"]), self._healer()])
+        rng = _FakeRng(randoms=[0.02, 0.0] + _QUIET_RANDOMS, randints=[0])
+        updated = advance_day(state, {"hunt": {"cat": "Ash", "zone": "home"}}, rng)
+        self.assertEqual(cats.cat_with_role(updated["cats"], "leader")["status"],
+                         "healthy")
+
+    def test_a_herb_store_speeds_recovery(self):
+        # 0.7: fails 0.3 + 0.3 (healer), passes with the herb store's 0.15.
+        for structures, expected in (([], "injured"), (["herb_store"], "healthy")):
+            state = _fixture_state(
+                cats=[self._leader(["curious"], "injured"), self._healer()],
+                camp={"structures": structures})
+            rng = _FakeRng(randoms=[0.7] + _QUIET_RANDOMS, randints=[0])
+            updated = advance_day(state, {}, rng)
+            self.assertEqual(
+                cats.cat_with_role(updated["cats"], "leader")["status"], expected)
+
+    def test_a_patient_cat_recovers_faster(self):
+        state = _fixture_state(cats=[self._leader(["patient"], "sick"), self._healer()])
+        rng = _FakeRng(randoms=[0.65] + _QUIET_RANDOMS, randints=[0])
+        updated = advance_day(state, {}, rng)
+        self.assertEqual(cats.cat_with_role(updated["cats"], "leader")["status"],
+                         "healthy")
+
+    def test_only_the_leaders_traits_move_the_rival(self):
+        state = _fixture_state(cats=[self._leader(["gentle"]), self._healer(["gruff"])])
+        rng = _FakeRng(randoms=list(_QUIET_RANDOMS), randints=[0])
+        updated = advance_day(state, {}, rng)
+        self.assertEqual(updated["other_clans"][0]["disposition"], 11)
+
+    def test_a_nursery_raises_the_birth_chance(self):
+        for structures, born in (([], False), (["nursery"], True)):
+            state = _fixture_state(camp={"structures": structures})
+            rng = _FakeRng(randoms=[0.1, 0.1, 0.99], randints=[0],
+                           choices=["Hazel", "quiet"])
+            updated = advance_day(state, {}, rng)
+            self.assertEqual(len(updated["cats"]) == 3, born)
+
+    def _raid(self, actions, structures=()):
+        state = _fixture_state(other_clans=[clans.new_clan("Iron Ridge", -60)],
+                               camp={"structures": list(structures)})
+        rng = _FakeRng(randoms=_QUIET_RANDOMS + [0.1], randints=[0])
+        return advance_day(state, actions, rng)
+
+    def test_a_hostile_rival_raids_and_it_is_logged(self):
+        updated = self._raid({})
+        self.assertEqual(updated["food"], 5 - 2 * upkeep.FOOD_PER_CAT - 2)
+        self.assertEqual(updated["event_log"][-1]["id"], "raid")
+        self.assertIn("Iron Ridge", updated["event_log"][-1]["text"])
+
+    def test_a_patrol_and_a_lookout_each_halve_a_raid(self):
+        base = 5 - 2 * upkeep.FOOD_PER_CAT
+        patrol = {"patrol": {"zone": "home"}}
+        self.assertEqual(self._raid(patrol)["food"], base - 1)
+        self.assertEqual(self._raid({}, ["lookout"])["food"], base - 1)
+        self.assertEqual(self._raid(patrol, ["lookout"])["food"], base)
+
+    def test_a_friendly_rival_shares_water(self):
+        state = _fixture_state(other_clans=[clans.new_clan("Iron Ridge", 60)])
+        rng = _FakeRng(randoms=_QUIET_RANDOMS + [0.1], randints=[0])
+        updated = advance_day(state, {}, rng)
+        self.assertEqual(updated["water"], 5 - 2 * upkeep.WATER_PER_CAT + 1)
+        self.assertEqual(updated["event_log"][-1]["id"], "gift")
 
 class AdvanceDayPropertyTest(unittest.TestCase):
     def test_invariants_hold_across_many_seeds(self):

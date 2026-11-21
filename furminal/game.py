@@ -40,6 +40,7 @@ import clans
 import events
 import hunting
 import population
+import tables
 import territory
 import upkeep
 import weather
@@ -83,12 +84,47 @@ def new_game(rng, clan_name, region_id, zones=None):
     }
 
 
+def _trait_sum(cat, effect):
+    return sum(tables.TRAIT_EFFECTS.get(t, {}).get(effect, 0) for t in cat["traits"])
+
+
+def _injury_scale(cat):
+    scale = 1.0
+    for trait in cat["traits"]:
+        scale *= tables.TRAIT_EFFECTS.get(trait, {}).get("hunt_injury_scale", 1.0)
+    return scale
+
+
+def _structure_sum(camp_state, effect):
+    return sum(tables.STRUCTURES[s]["effects"].get(effect, 0)
+               for s in camp_state["structures"])
+
+
+def structure_cost(structure_id):
+    """Food a structure costs to build (`data/structures.json`)."""
+    return tables.STRUCTURES[structure_id]["cost"]["food"]
+
+
+def _hunter(cats_list, name):
+    return next((cat for cat in cats_list if cat["name"] == name), None)
+
+
 def advance_day(state, actions, rng):
     """Return the next day's state after applying `actions` and rolling
     every daily system (weather, clan disposition, kit birth, event).
 
     Raises ValueError if `hunt`/`gather_water` names an uncontrolled
-    zone, or if `unlock_structure` is invalid (see `camp.unlock_structure`).
+    zone, if `unlock_structure` is invalid (see `camp.unlock_structure`),
+    or if the clan can't afford it.
+
+    Phase C effects, all tuned in `data/*.json` (see `tables.py`):
+    the hunter's traits adjust its catch and injury risk, and a hunter
+    who isn't healthy brings back half; structures cost food when built
+    and then help births, recovery, or raids; cats' traits help their
+    own recovery; the leader's traits push the rival's disposition; and
+    a hostile rival may raid (halved by a patrol that day, and again by
+    a lookout) while a friendly one may share water. The border roll is
+    the day's last rng call, so it never shifts any earlier roll.
     Raises KeyError if any action names a zone id not in `state["zones"]`.
 
     Cat count can decrease: a food/water shortfall during upkeep can
@@ -106,8 +142,18 @@ def advance_day(state, actions, rng):
         zone = zones[hunt["zone"]]
         if not zone["controlled"]:
             raise ValueError(f"cannot hunt in uncontrolled zone: {hunt['zone']}")
-        result = hunting.resolve_hunt(zone["terrain"], rng)
-        food += int(result["food"] * multiplier)
+        hunter = _hunter(cats_list, hunt["cat"])
+        if hunter is None:
+            result = hunting.resolve_hunt(zone["terrain"], rng)
+        else:
+            result = hunting.resolve_hunt(
+                zone["terrain"], rng,
+                food_bonus=_trait_sum(hunter, "hunt_food_bonus"),
+                injury_scale=_injury_scale(hunter))
+        catch = int(result["food"] * multiplier)
+        if hunter is not None and hunter["status"] != "healthy":
+            catch //= 2
+        food += catch
         if result["injured"]:
             cats_list = cats.set_cat_status(cats_list, hunt["cat"], "injured")
 
@@ -130,18 +176,34 @@ def advance_day(state, actions, rng):
     unlock_structure = actions.get("unlock_structure")
     if unlock_structure is not None:
         camp_state = camp.unlock_structure(camp_state, unlock_structure)
+        cost = structure_cost(unlock_structure)
+        if food < cost:
+            name = tables.STRUCTURES[unlock_structure]["name"]
+            raise ValueError(f"not enough food to build {name}: need {cost}, have {food}")
+        food -= cost
 
     upkeep_result = upkeep.resolve_upkeep(cats_list, food, water, rng)
     cats_list = upkeep_result["cats"]
     food = upkeep_result["food"]
     water = upkeep_result["water"]
 
-    cats_list = cats.maybe_recover(cats_list, rng)
+    herb_bonus = _structure_sum(camp_state, "recovery_bonus")
+    cats_list = cats.maybe_recover(cats_list, rng, extra={
+        cat["name"]: herb_bonus + _trait_sum(cat, "recovery_bonus")
+        for cat in cats_list
+    })
 
-    other_clans = [clans.drift_disposition(clan, rng) for clan in state["other_clans"]]
+    leader = cats.cat_with_role(cats_list, cats.LEADER)
+    leader_drift = _trait_sum(leader, "leader_drift") if leader else 0
+    other_clans = [
+        clans.new_clan(drifted["name"], drifted["disposition"] + leader_drift)
+        for drifted in (clans.drift_disposition(clan, rng)
+                        for clan in state["other_clans"])
+    ]
     weather_state = weather.advance_weather(state["weather"], rng)
 
-    kit = population.maybe_birth_kit(rng, cats_list)
+    kit = population.maybe_birth_kit(
+        rng, cats_list, chance_bonus=_structure_sum(camp_state, "birth_chance_bonus"))
     if kit is not None:
         cats_list = cats_list + [kit]
 
@@ -150,6 +212,21 @@ def advance_day(state, actions, rng):
     if event is not None:
         food += event["food_delta"]
         event_log = event_log + [{"day": state["day"], "id": event["id"], "text": event["text"]}]
+
+    for clan in other_clans:
+        incident = clans.border_incident(clan, tables.BORDER, rng)
+        if incident is None:
+            continue
+        loss = -incident["food"] if incident["food"] < 0 else 0
+        if loss and patrol is not None:
+            loss //= 2
+        for _ in range(int(_structure_sum(camp_state, "raid_shield"))):
+            loss //= 2
+        food += incident["food"] if incident["food"] >= 0 else -loss
+        water += incident["water"]
+        event_log = event_log + [{"day": state["day"],
+                                  "id": "raid" if incident["food"] < 0 else "gift",
+                                  "text": incident["text"]}]
 
     return {
         **state,
