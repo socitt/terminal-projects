@@ -187,3 +187,136 @@ the broken zero-cache-bug record. Checked here against both commits:
    on every rebuild of `//furminal:runner` even though its deps are now
    right. Something like recording that `--mutate` last passed for the
    target would let the note go quiet until the src changes.
+
+## Round 3: stress test with new shapes (2026-11-21, lirk 1.1.0)
+
+Rounds 1–2 kept finding bugs only when the repo had a *new shape*, not
+from more invocations. So this round added two sub-projects chosen for
+the lirk features this repo had never used, then probed each one:
+
+- **Nemo** (`nemo/`, plus `nemo_adapter.py` in every board game): a
+  computer opponent for all five games. Gives the repo nested packages
+  (`nemo` → `nemo.search`, `nemo.cam`), an ancestor `__init__.py`
+  that matters, and wide fan-in (13 tests downstream of one file).
+- **furminal Phase C**: tuning moved into `furminal/data/*.json`, read
+  at runtime and declared as `data`, the first in this repo.
+
+The graph went from 66 targets / 32 tests to **85 / 41**, all green;
+full `lirk test //...` from a cold cache takes 11s here.
+
+### Summary
+
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| R3-1 | Stale `.pyc` gives a wrong PASS that `test`, `--force` and `verify` all confirm | **High** | open, lirk |
+| R3-2 | L7 hit on a natural shape, and `verify --mutate` can't see it | Medium | open, lirk |
+| R3-3 | `verify --mutate` cost grows fast and prints no progress | Medium | open, lirk |
+| R3-4 | `--fail-fast` summary counts unrun tests as not passed | Low | open, lirk |
+| R3-5 | Raid tests hard-coded numbers that live in a data table | — | fixed here |
+
+### R3-1: a stale `.pyc` makes lirk report and cache a wrong PASS (high)
+
+lirk runs test subprocesses without `PYTHONDONTWRITEBYTECODE` or `-B`,
+so Python writes and reads `__pycache__` in the repo as normal. Python
+decides whether a `.pyc` is current by the source's **mtime (whole
+seconds) and size**, not its content. lirk decides whether to rerun by
+content hash. When the two disagree, lirk reruns the test against old
+bytecode and caches the result under the new fingerprint.
+
+Repro (scratch repo, one library and one test):
+
+1. `lib.py` is `LIMIT = 1`; the test asserts `LIMIT == 1`.
+   `lirk test //...`: PASS, and `__pycache__/lib.*.pyc` is written.
+2. Rewrite `lib.py` as `LIMIT = 2` (same size) and keep its mtime
+   (`touch -d @<old mtime>`). That's what `tar`, `cp -p`, `rsync -t` and
+   unzip do, and what any two same-size edits within one second do.
+3. `lirk test //...` sees the new fingerprint and reruns: **PASS**.
+   `--force`: **PASS**. `lirk verify`: **0 stale**.
+4. Delete `__pycache__` and rerun: **FAIL**, the true answer.
+
+So the wrong result is cached as if it were fresh, and both ways to
+double-check it agree with it. This is the same "green you can't
+believe" class as H1/H2, and worse, because no declaration fixes it.
+
+It was found by accident: Nemo's mutation testing changed `if wins:` to
+`if False:`, which is the same length, within the same second as the
+previous run, and the mutant "survived". It only failed once bytecode
+writing was off.
+
+**Suggested fix:** in `run_test`'s child environment, set
+`PYTHONDONTWRITEBYTECODE=1` **and** point `PYTHONPYCACHEPREFIX` at an
+empty lirk-owned directory. Both are needed: the first alone still
+*reads* the repo's existing `__pycache__` (`-B` behaves the same, as I
+found when my own "truth" check passed with `-B`). The cost is
+recompiling imports on every run, which is small next to process
+start-up. Bump `ACTION_VERSION`, since past greens may be stale.
+
+### R3-2: L7 on a real shape, and `--mutate` can't see it (medium)
+
+TASKS.md keeps L7 (an undeclared *ancestor* `__init__.py` is never
+fingerprinted) open "until a real repo hits it". Nemo's layout is that
+shape: `nemo/cam/avatar_test.py` only imports `nemo.cam`, so
+`nemo/__init__.py` is reached only as an ancestor.
+
+Seeded on a copy (the real BUILD files declare it correctly): leave
+`nemo/__init__.py` undeclared and imported directly by nothing, run,
+then break it. `//nemo/cam:avatar_test` stays **cached and green**;
+`--force` fails it. `minimax_test` was caught only because it happens
+to `import nemo` directly.
+
+`lirk verify --mutate` reports **0 undeclared dependencies** on that
+state. It only breaks *declared* sources, so an undeclared file is
+never broken, and L7 can't be found by the tool meant to find hidden
+edges. Either fix L7 (collect ancestor `__init__.py` files and require
+them declared), or have `--mutate` also break the undeclared `.py`
+files that declared imports reach.
+
+### R3-3: `verify --mutate` cost and silence (medium)
+
+| Graph | Sources broken | Test runs | Time here |
+|---|---|---|---|
+| Round 2: 66 targets | 34 | 984 | ~2 min |
+| Round 3 Nemo checkpoint: 83 targets | 45 | 1,615 | **413 s** |
+
+That's 25% more targets for 3.5× the time. Runs scale with sources ×
+tests, and the new tests are subprocess-heavy. On iSH that's plausibly
+hours, so the incremental mode asked for last round matters more now.
+Separately, it prints its two header lines and then **nothing** for the
+whole run. On a phone a seven-minute (or two-hour) silent command looks
+hung. A one-line progress note per source would fix that.
+
+The result itself was right: 0 undeclared edges on the new Nemo graph.
+
+### R3-4: `--fail-fast` summary (low)
+
+With `shared/term.py` broken, `--fail-fast` stopped after one test
+(1s vs 4s) and said `78 target(s) not run`, then `lirk: 0/41 tests
+passed`. 40 of those never ran. "0/1 run, 40 not run" would be
+accurate.
+
+### R3-5: fixed here
+
+The data-file probe (a raid's size −2 → −3 in `border.json`) correctly
+reran exactly `//furminal:tables`' five dependents, and `game_test`
+went red. That was a bug in my tests, not lirk: they hard-coded −2, so
+a pure rebalance (the whole point of the data layer) broke them. They
+now read the size from the table.
+
+### What held up
+
+- **Nested packages:** `//nemo:nemo` → `//nemo/search:minimax` →
+  `//nemo/cam:avatar` built and tested cleanly. Dropping minimax's dep
+  on `//nemo:nemo` was caught by H1 with a precise message.
+- **`lirk fix` on a real change:** after adding `//furminal:tables`, it
+  added exactly the two missing deps (`camp` → `:tables`,
+  `tables_test` → `:cats`), `--dry-run` first, nothing else touched.
+- **`data` directories:** a declared JSON edit reran exactly the five
+  dependents. An undeclared one gave a cached PASS that `--mutate`
+  missed beforehand and plain `verify` caught afterwards, exactly as
+  documented.
+- **Fan-in:** one comment in `nemo/__init__.py` reran exactly the 13
+  tests downstream of it.
+- **v1.1 features:** cache pruning dropped a renamed target's old entry;
+  `timeout = 1` in `.lirk-root` timed out exactly the three tests
+  slower than 1s; the file-path build note still flags
+  `furminal/runner.py`.

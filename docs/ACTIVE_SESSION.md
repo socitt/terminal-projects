@@ -1581,3 +1581,35 @@ lirk v1.1.0 shipped both suggestions (build note for file-path loads,
 `lirk verify --mutate`. Four remaining asks for lirk recorded at the end
 of `docs/lirk-notes.md` (incremental `--mutate`, a clearer missing-root
 error, a source-tree-write note, quieting a checked note).
+
+## Done (2026-11-21, same session): Nemo, furminal Phase C, lirk round 3
+
+Asked to expand sub-projects as a stress test of lirk. Chosen for the
+lirk features this repo had never exercised, not for target count.
+
+- **Nemo** (`nemo/` + `nemo_adapter.py` per game): the computer
+  opponent from `docs/USER_TESTING.md`, easy/medium/hard in all five
+  board games, plus the Nemo cam. Game-agnostic negamax with alpha-beta
+  (`nemo.search`), per-game adapters, shared prompt (`nemo.ui`),
+  `TP_NEMO_SEED` for repeatable games (backgammon dice included now).
+  Every piece mutation-checked: 7 core, 15 adapter, 5 wiring mutants,
+  all caught after fixing 4 hollow tests along the way. **Still needs a
+  human playtest pass** before USER_TESTING counts it done.
+- **furminal Phase C** (closes G4–G7): structure costs/effects, trait
+  effects, leader-driven disposition, raids and gifts, all tuned in
+  `furminal/data/*.json` via `tables.py`, declared as lirk `data`.
+  Balanced over 1000 seeds (costs 4/3/3 → 3/2/2, so building pays).
+  14 mutants caught. See `furminal/ARCHITECTURE.md` §8.
+- **lirk round 3** in `docs/lirk-notes.md`. Headline: a stale `.pyc`
+  makes lirk report *and cache* a wrong PASS that `--force` and
+  `verify` both confirm (R3-1, high). Also L7 on a natural shape and
+  invisible to `--mutate`, and `--mutate`'s cost (413s, silent).
+- 85 targets, 41/41 tests green; full `lirk test //...` 11s cold.
+
+## Next up
+
+- Take round 3 (R3-1 first) to the lirk repo.
+- Human playtest of Nemo across all five games.
+- Remaining USER_TESTING items: connect4's out-of-range input
+  (`prompt_choice` reads only the first character, so `34` plays 3),
+  rematch prompts, the story self-loop UX.
