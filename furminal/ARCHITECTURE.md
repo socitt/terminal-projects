@@ -56,7 +56,9 @@ in-game text, or identifiers.
  L1  population.py                → cats.py
       ├──────────────────────────────────────────────────────────────
  L0  cats  camp  territory  hunting  clans  weather  events  upkeep
-                                  no furminal-internal dependencies
+      │                           no dependencies on each other
+      ├──────────────────────────────────────────────────────────────
+ D   tables.py                    data/*.json, read once at import
 ```
 
 Rules that hold today and must keep holding:
@@ -64,13 +66,21 @@ Rules that hold today and must keep holding:
 1. **L0 modules never import each other.** Each is independently
    unit-testable in isolation. `population.py` is the single exception
    and depends only on `cats.py` (for the shared name/trait pools).
+   Any layer may import `tables.py` (D, Phase C), which imports nothing
+   from furminal; today only `camp.py` and `game.py` do. Other L0
+   modules take Phase C effects as plain parameters (`food_bonus`,
+   `injury_scale`, `extra`, `chance_bonus`, `rules`) that `game.py`
+   composes from the tables, so they stay table-agnostic.
 2. **Only `game.py` composes.** Cross-module effects live in
    `advance_day`, never inside an L0 module. Weather is the worked
    example: `weather.py` exposes `yield_multiplier`, `game.py` applies
    it to hunt results, and `hunting.py` stays weather-agnostic.
 3. **Only L3+ does I/O.** No `print`, no `input`, no clock, no
-   filesystem below `runner.py`. The one exception is
-   `game.save_state`/`load_state`, which take an explicit path.
+   filesystem below `runner.py`. The exceptions are
+   `game.save_state`/`load_state`, which take an explicit path, and
+   `tables.py`, which reads its own package-relative `data/*.json`
+   once at import and validates them, so a malformed table fails at
+   startup rather than mid-game.
 4. **furminal never imports `region-explorer` below L3.** `game_state`
    carries `region_id` as an opaque string tag. `game.py` neither
    validates it nor looks it up. Only the start flow in `runner.py`/
@@ -94,10 +104,11 @@ can be tested without importing map data. This mirrors the existing
 | Module | Owns | Key API |
 | --- | --- | --- |
 | `cats.py` | Cat dicts, name/trait pools, roster generation, recovery | `new_cat`, `generate_starting_cats(rng)`, `cat_with_role`, `set_cat_status`, `maybe_recover(cats, rng)` |
-| `camp.py` | Structure catalog, unlock state | `new_camp`, `has_structure`, `unlock_structure` |
+| `tables.py` | Phase C tuning tables from `data/*.json`, validation | `STRUCTURES`, `TRAIT_EFFECTS`, `BORDER`, `load`, `validate` |
+| `camp.py` | Structure catalog (from `tables`), unlock state | `new_camp`, `has_structure`, `unlock_structure` |
 | `territory.py` | Zone graph, fog-of-war gates | `generate_zone_graph(rng)`, `can_explore`/`explore_zone`, `can_control`/`control_zone` |
 | `hunting.py` | Hunt & water outcomes, wildlife risk | `resolve_hunt(terrain, rng)`, `resolve_water_gathering(terrain, rng)` |
-| `clans.py` | The one rival clan, disposition drift | `generate_neighbor_clan(rng)`, `drift_disposition`, `disposition_tier` |
+| `clans.py` | The one rival clan, disposition drift, border incidents | `generate_neighbor_clan(rng)`, `drift_disposition`, `disposition_tier`, `border_incident(clan, rules, rng)` |
 | `weather.py` | Weather rotation and yield penalty | `advance_weather(current, rng)`, `yield_multiplier(weather)` |
 | `events.py` | Curated event table | `maybe_trigger_event(rng)` |
 | `population.py` | Kit births | `maybe_birth_kit(rng, existing_cats)` |
@@ -239,7 +250,14 @@ Enforced by tests; treat a break as a bug, not a design change.
   caller-owned dicts or lists.
 - **Data as tables.** Tuning lives in module-level constants
   (`FOOD_YIELD`, `YIELD_MULTIPLIER`, `EVENTS`) so balance changes are
-  data edits.
+  data edits. Phase C's tables (structures, trait effects, border
+  incidents) went one step further, into `data/*.json`: those are
+  declared as lirk `data` on `//furminal:tables`, because an import
+  check can't see a file that's only read.
+- **New effects don't move existing rolls.** Phase C changes the
+  thresholds of rolls that already happen and adds one roll only at
+  the very end of the day (the border), so every seeded test written
+  before it still sees the same sequence of numbers.
 - **Testing discipline** (repo-wide, see `docs/ACTIVE_SESSION.md`):
   every module is mutation-verified before it is called done — inject
   2–3 realistic bugs, confirm the suite fails, restore. A test that
@@ -265,10 +283,10 @@ None of these are bugs in what exists; they are unbuilt v1 surface.
 | ~~G1~~ | ~~No daily consumption.~~ **Closed by `upkeep.py`.** | — |
 | ~~G2~~ | ~~Injuries are permanent.~~ **Closed by `cats.maybe_recover`.** | — |
 | ~~G3~~ | ~~No end condition.~~ **Closed by `game.is_game_over`/`outcome`.** | — |
-| G4 | **Structures are inert and free.** `nursery`/`herb_store` unlock at no cost and change nothing. | Medium |
-| G5 | **Traits are decorative.** 15 traits, zero mechanical effect. | Medium |
-| G6 | **Disposition is decorative.** It drifts and is never read; `disposition_tier` has no caller. | Medium |
-| G7 | **Roles are partly decorative.** The healer now affects recovery odds (G2); the leader role still has no mechanical effect. | Medium |
+| ~~G4~~ | ~~Structures are inert and free.~~ **Closed by Phase C**: costs and effects in `data/structures.json`. | — |
+| ~~G5~~ | ~~Traits are decorative.~~ **Closed by Phase C**: 10 of 15 traits have effects (`data/traits.json`); the rest stay flavour. | — |
+| ~~G6~~ | ~~Disposition is decorative.~~ **Closed by Phase C**: raids when hostile, gifts when friendly (`data/border.json`). | — |
+| ~~G7~~ | ~~Roles are partly decorative.~~ **Closed by Phase C**: the leader's traits drive the rival's disposition. | — |
 | G8 | **`patrol` fails silently** where `hunt`/`gather_water` raise. | Low — but the runner cannot tell the player why nothing happened. |
 | G9 | **Ring-only zone graphs.** Every zone has exactly 2 neighbours, so expansion is a walk along a line. | Low — fine for v1, limits replay value. |
 | G10 | **The day report nets out hunting against upkeep.** It can only show `Food 5 -> 5`, never "the hunt brought 2, the clan ate 2" — a hunt's yield is not recoverable by diffing states. | Medium — a player can derive it from the one-per-cat rule in `README.md`, but a bad-weather hunt that yields 0 is indistinguishable from one that fed the clan. |
@@ -308,12 +326,27 @@ probe also found the roster-bound wording corrected in §5.
 - B4 subprocess integration tests (`runner_test.py`, `main_test.py`).
 - B5 `furminal/README.md`.
 
-**Phase C — depth.** Optional, closes G4–G7. Only worth doing once
-play proves the loop is fun.
+**Phase C — depth.** Closes G4–G7. **Done (2026-11-21).** Every
+number is in `data/*.json`, read and validated by `tables.py`.
 
-- C1 structure costs and effects.
-- C2 traits with mechanical weight.
-- C3 disposition consequences (raids when hostile).
+- C1 structure costs and effects: Nursery (3 food, +0.1 birth chance),
+  Herb Store (2, +0.15 recovery), Lookout (2, halves raids). The runner
+  only offers what the clan can afford.
+- C2 traits with mechanical weight: hunt yield and injury risk,
+  recovery, and — for the leader — disposition drift. A hunter who
+  isn't healthy brings back half, closing the "status doesn't gate
+  hunting" finding below.
+- C3 disposition consequences: a hostile rival raids (30%, -2 food;
+  halved by a patrol that day and by a Lookout), a friendly one shares
+  water (20%, +1).
+
+Balanced by simulation, 1000 seeds per policy, same scripted policy
+before and after: plain hunt/gather/patrol won 33.0% before Phase C and
+30.4% after; with building, at the first costs tried (4/3/3), clans
+built 0.36 structures a game and won 30.1% — too dear to matter. At
+3/2/2 they build about one a game and win 36.3%, so building is now a
+choice that pays. (These are lower than Phase A's ~49% only because
+this is a different, simpler scripted policy.)
 
 Phase A before Phase B was deliberate: building UI over a loop with no
 consumption and no ending would have meant rewriting the screens once

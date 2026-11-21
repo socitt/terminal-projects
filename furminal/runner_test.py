@@ -177,6 +177,24 @@ class RunnerEndToEndTest(unittest.TestCase):
         self.assertIn("Camp: Nursery", result.stdout)
         self.assertNotIn("Traceback", result.stdout + result.stderr)
 
+    def test_build_menu_offers_only_what_the_clan_can_afford(self):
+        # Food 2: the Nursery (3) is out of reach, the Herb Store (2) isn't.
+        result = _run(
+            repr(_two_cat_state(food=2)), "u\n1\ne\n\ns\n", self.save_path,
+            extra_setup="game.SURVIVAL_GOAL_DAYS = 5",
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("1. Herb Store (2 food)", result.stdout)
+        self.assertNotIn("Nursery (", result.stdout)
+        self.assertIn("Camp: Herb Store", result.stdout)
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+
+    def test_no_build_option_when_nothing_is_affordable(self):
+        result = _run(repr(_two_cat_state(food=1)), "e\n\ns\n", self.save_path,
+                      extra_setup="game.SURVIVAL_GOAL_DAYS = 5")
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("Unlock a structure", result.stdout)
+
     def test_save_and_quit_writes_a_resumable_save_file(self):
         result = _run(repr(_two_cat_state()), "u\n1\ne\n\ns\n", self.save_path)
         self.assertEqual(result.returncode, 0)

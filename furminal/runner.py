@@ -292,7 +292,15 @@ def _patrol_targets(state):
 
 
 def _unlockable_structures(state):
-    return [s for s in camp.STRUCTURES if not camp.has_structure(state["camp"], s)]
+    """Structures not yet built that the clan can pay for out of
+    today's stores. Checked against the stores before the day's hunt,
+    so it is conservative: whatever the runner offers, `advance_day`
+    can afford, and it never raises "not enough food" at the player."""
+    return [
+        s for s in camp.STRUCTURES
+        if not camp.has_structure(state["camp"], s)
+        and state["food"] >= game.structure_cost(s)
+    ]
 
 
 def _prompt_hunt(state):
@@ -315,7 +323,8 @@ def _prompt_patrol(state, targets):
 
 def _prompt_unlock_structure(available):
     for i, structure_id in enumerate(available, start=1):
-        print(f"{i}. {camp.STRUCTURES[structure_id]['name']}")
+        name = camp.STRUCTURES[structure_id]["name"]
+        print(f"{i}. {name} ({game.structure_cost(structure_id)} food)")
     keys = [str(i) for i in range(1, len(available) + 1)]
     key = input_module.prompt_choice("Unlock which structure? > ", keys)
     return available[int(key) - 1]

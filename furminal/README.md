@@ -28,15 +28,27 @@ once per day, then end the day:
 - **Patrol** — scout a zone next to explored ground, and claim it if
   it's already scouted and next to territory you hold. Only zones where
   a patrol would actually accomplish something are offered.
-- **Unlock a structure** — the Nursery or the Herb Store. Free in v1,
-  and neither does anything yet (`ARCHITECTURE.md` gap G4).
+- **Build a structure** — paid in food, and only offered when you can
+  afford it: the **Nursery** (3) makes kits likelier, the **Herb
+  Store** (2) speeds recovery, the **Lookout** (2) halves raids.
+
+Who hunts matters: a keen-eyed, quick or fierce cat brings back one
+more, a brave one is half as likely to be hurt by a large mammal and a
+cautious one never is, and a cat that isn't healthy brings back half.
+Patient and stubborn cats recover faster. The leader sets the tone at
+the border — gentle or loyal leaders warm the rival clan, gruff or
+fierce ones sour it. A **hostile** rival may raid the fresh-kill pile
+(a patrol that day halves the loss, and so does a Lookout); a
+**friendly** one may share water. Every number here lives in
+`data/*.json`, so rebalancing is an edit to a table.
 
 Then, every day, whether you acted or not: every cat eats and drinks
 one of each. A store that can't cover the roster makes a cat sick, or
 kills one already sick — the only way cats die. Injured and sick cats
 roll to recover, at better odds while a healthy healer is alive. Then
-the rival clan's mood drifts, the weather turns, a kit may be born, and
-an event may fire. The end-of-day report is the diff of all of it.
+the rival clan's mood drifts, the weather turns, a kit may be born, an
+event may fire, and the rival may raid or help. The end-of-day report
+is the diff of all of it.
 
 Bad weather multiplies hunting and gathering down (`storm` is the
 worst at 0.5), so a run of storms is what turns a comfortable margin
