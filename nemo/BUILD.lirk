@@ -1,0 +1,7 @@
+# Nemo's top-level package: level constants. `nemo.search` and
+# `nemo.cam` are nested packages with their own BUILD.lirk files; both
+# import this one, so every Nemo target's closure includes it.
+[[target]]
+name = "nemo"
+type = "library"
+srcs = ["__init__.py"]

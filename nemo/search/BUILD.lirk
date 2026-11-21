@@ -1,0 +1,11 @@
+[[target]]
+name = "minimax"
+type = "library"
+srcs = ["__init__.py", "minimax.py"]
+deps = ["//nemo:nemo"]
+
+[[target]]
+name = "minimax_test"
+type = "test"
+srcs = ["minimax_test.py"]
+deps = [":minimax"]
