@@ -1,0 +1,11 @@
+[[target]]
+name = "avatar"
+type = "library"
+srcs = ["__init__.py", "avatar.py"]
+deps = ["//nemo/search:minimax"]
+
+[[target]]
+name = "avatar_test"
+type = "test"
+srcs = ["avatar_test.py"]
+deps = [":avatar"]
