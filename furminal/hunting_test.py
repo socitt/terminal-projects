@@ -101,5 +101,34 @@ class ResolveWaterGatheringTest(unittest.TestCase):
                     self.assertTrue(0 <= water <= 1, f"{terrain} yielded {water}")
 
 
+
+class _Seq:
+    def __init__(self, randoms, randints=()):
+        self._r, self._i = list(randoms), list(randints)
+
+    def random(self):
+        return self._r.pop(0)
+
+    def randint(self, low, high):
+        return self._i.pop(0)
+
+
+class HuntModifierTest(unittest.TestCase):
+    def test_food_bonus_is_added_to_a_catch(self):
+        result = resolve_hunt("meadow", _Seq([0.9], [2]), food_bonus=1)
+        self.assertEqual(result["food"], 3)
+
+    def test_food_bonus_never_rescues_a_scared_off_catch(self):
+        result = resolve_hunt("meadow", _Seq([0.0, 0.99]), food_bonus=2)
+        self.assertEqual(result["food"], 0)
+
+    def test_injury_scale_multiplies_the_injury_chance(self):
+        # 0.3 < INJURY_CHANCE (0.4) injures normally; halved to 0.2, not.
+        self.assertTrue(resolve_hunt("meadow", _Seq([0.0, 0.3]))["injured"])
+        self.assertFalse(resolve_hunt("meadow", _Seq([0.0, 0.3]),
+                                      injury_scale=0.5)["injured"])
+        self.assertFalse(resolve_hunt("meadow", _Seq([0.0, 0.0]),
+                                      injury_scale=0.0)["injured"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -74,7 +74,7 @@ def set_cat_status(cats, name, status):
     return [dict(cat, status=status) if cat["name"] == name else cat for cat in cats]
 
 
-def maybe_recover(cats, rng):
+def maybe_recover(cats, rng, extra=None):
     """Return a new cat list where each non-"healthy" cat independently
     rolls a chance to return to "healthy": `RECOVERY_CHANCE`, boosted by
     `HEALER_RECOVERY_BONUS` if a "healthy" healer is present among
@@ -82,12 +82,19 @@ def maybe_recover(cats, rng):
     including themselves). Closes gap G2 — the healer role's first
     mechanical effect. Never adds/removes cats. `rng` must support
     `random`.
+
+    Phase C: `extra` maps a cat's name to a further bonus for that cat
+    (its traits, a herb store), composed by `game.py`.
     """
+    extra = extra or {}
     healer = cat_with_role(cats, HEALER)
     healer_present = healer is not None and healer["status"] == "healthy"
     chance = RECOVERY_CHANCE + (HEALER_RECOVERY_BONUS if healer_present else 0)
 
     return [
-        dict(cat, status="healthy") if cat["status"] != "healthy" and rng.random() < chance else cat
+        dict(cat, status="healthy")
+        if cat["status"] != "healthy"
+        and rng.random() < chance + extra.get(cat["name"], 0)
+        else cat
         for cat in cats
     ]

@@ -187,5 +187,21 @@ class MaybeRecoverTest(unittest.TestCase):
         self.assertEqual(len(updated), 2)
 
 
+
+class RecoveryExtraTest(unittest.TestCase):
+    def test_extra_bonus_applies_only_to_the_named_cat(self):
+        sick = [new_cat("A", ["quiet"], status="sick"),
+                new_cat("B", ["quiet"], status="sick")]
+
+        class _Rolls:
+            def __init__(self):
+                self._r = [0.35, 0.35]  # above 0.3 base, below 0.3 + 0.1
+
+            def random(self):
+                return self._r.pop(0)
+
+        result = maybe_recover(sick, _Rolls(), extra={"A": 0.1})
+        self.assertEqual([c["status"] for c in result], ["healthy", "sick"])
+
 if __name__ == "__main__":
     unittest.main()

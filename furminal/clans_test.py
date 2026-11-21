@@ -5,6 +5,7 @@ from clans import (
     DISPOSITION_MAX,
     DISPOSITION_MIN,
     NEIGHBOR_CLAN_NAMES,
+    border_incident,
     disposition_tier,
     drift_disposition,
     generate_neighbor_clan,
@@ -94,6 +95,35 @@ class DispositionTierTest(unittest.TestCase):
         self.assertEqual(disposition_tier(0), "neutral")
         self.assertEqual(disposition_tier(33), "neutral")
 
+
+
+class BorderIncidentTest(unittest.TestCase):
+    RULES = {
+        "hostile": {"chance": 0.3, "food": -2, "water": 0, "text": "{rival} raided."},
+        "friendly": {"chance": 0.2, "food": 0, "water": 1, "text": "{rival} gave."},
+    }
+
+    class _Rng:
+        def __init__(self, *rolls):
+            self.rolls = list(rolls)
+
+        def random(self):
+            return self.rolls.pop(0)
+
+    def test_a_neutral_clan_does_nothing_and_rolls_nothing(self):
+        rng = self._Rng()
+        self.assertIsNone(border_incident(new_clan("Ridge", 0), self.RULES, rng))
+
+    def test_a_hostile_clan_raids_on_a_low_roll(self):
+        incident = border_incident(new_clan("Ridge", -50), self.RULES, self._Rng(0.1))
+        self.assertEqual(incident, {"food": -2, "water": 0, "text": "Ridge raided."})
+        self.assertIsNone(border_incident(new_clan("Ridge", -50), self.RULES,
+                                          self._Rng(0.5)))
+
+    def test_a_friendly_clan_gives_on_a_low_roll(self):
+        incident = border_incident(new_clan("Ridge", 50), self.RULES, self._Rng(0.1))
+        self.assertEqual(incident["water"], 1)
+        self.assertEqual(incident["text"], "Ridge gave.")
 
 if __name__ == "__main__":
     unittest.main()

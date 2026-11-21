@@ -9,16 +9,17 @@ import cats
 BIRTH_CHANCE = 0.05
 
 
-def maybe_birth_kit(rng, existing_cats):
+def maybe_birth_kit(rng, existing_cats, chance_bonus=0.0):
     """With `BIRTH_CHANCE` probability, return a new kit cat dict (see
     `cats.new_cat`): an unused name from `cats.NAMES`, exactly one
     random trait, no role, "healthy" status.
 
     Returns None if birth doesn't trigger this day, or if every name
     in `cats.NAMES` is already taken by `existing_cats`. `rng` must
-    support `random`/`choice`.
+    support `random`/`choice`. `chance_bonus` (a nursery, Phase C) is
+    added to `BIRTH_CHANCE`.
     """
-    if rng.random() >= BIRTH_CHANCE:
+    if rng.random() >= BIRTH_CHANCE + chance_bonus:
         return None
 
     used_names = {cat["name"] for cat in existing_cats}

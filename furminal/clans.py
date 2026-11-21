@@ -47,3 +47,16 @@ def disposition_tier(disposition):
     if disposition >= 34:
         return "friendly"
     return "neutral"
+
+
+def border_incident(clan, rules, rng):
+    """What `clan` does at the border today, per its disposition tier
+    (Phase C, closes G6): None, or {"food": int, "water": int,
+    "text": str} from `rules[tier]` (the "hostile" raid or "friendly"
+    gift in `data/border.json`). A neutral clan does nothing and makes
+    no rng call; the others make exactly one."""
+    rule = rules.get(disposition_tier(clan["disposition"]))
+    if rule is None or rng.random() >= rule["chance"]:
+        return None
+    return {"food": rule["food"], "water": rule["water"],
+            "text": rule["text"].format(rival=clan["name"])}

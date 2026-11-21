@@ -71,5 +71,21 @@ class MaybeBirthKitPropertyTest(unittest.TestCase):
         self.assertTrue(any(kit is None for kit in births))
 
 
+
+class BirthBonusTest(unittest.TestCase):
+    def test_chance_bonus_raises_the_birth_threshold(self):
+        class _Rng:
+            def __init__(self):
+                self._r = [0.1]
+
+            def random(self):
+                return self._r.pop(0)
+
+            def choice(self, seq):
+                return seq[0]
+
+        self.assertIsNone(maybe_birth_kit(_Rng(), []))
+        self.assertIsNotNone(maybe_birth_kit(_Rng(), [], chance_bonus=0.1))
+
 if __name__ == "__main__":
     unittest.main()

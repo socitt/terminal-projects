@@ -32,7 +32,7 @@ MINOR_WILDLIFE_CHANCE = 0.25
 INJURY_CHANCE = 0.4
 
 
-def resolve_hunt(terrain, rng):
+def resolve_hunt(terrain, rng, food_bonus=0, injury_scale=1.0):
     """Resolve one hunt in a zone of the given `terrain`.
 
     Returns {"food": int, "encounter": "none"|"minor_wildlife"|
@@ -40,6 +40,11 @@ def resolve_hunt(terrain, rng):
     always scares off the catch (food 0) and may injure the cat;
     "minor_wildlife" and "none" never injure and yield the terrain's
     usual food range.
+
+    Phase C: `food_bonus` is added to any catch that isn't scared off,
+    and `injury_scale` multiplies `INJURY_CHANCE` -- both from the
+    hunter's traits, supplied by `game.py`. Neither changes which rng
+    calls are made, so a seeded hunt rolls the same numbers either way.
     """
     low, high = FOOD_YIELD[terrain]
     roll = rng.random()
@@ -48,11 +53,13 @@ def resolve_hunt(terrain, rng):
         return {
             "food": 0,
             "encounter": "large_mammal",
-            "injured": rng.random() < INJURY_CHANCE,
+            "injured": rng.random() < INJURY_CHANCE * injury_scale,
         }
     if roll < LARGE_MAMMAL_CHANCE + MINOR_WILDLIFE_CHANCE:
-        return {"food": rng.randint(low, high), "encounter": "minor_wildlife", "injured": False}
-    return {"food": rng.randint(low, high), "encounter": "none", "injured": False}
+        return {"food": rng.randint(low, high) + food_bonus,
+                "encounter": "minor_wildlife", "injured": False}
+    return {"food": rng.randint(low, high) + food_bonus, "encounter": "none",
+            "injured": False}
 
 
 def resolve_water_gathering(terrain, rng):
