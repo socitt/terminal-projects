@@ -13,7 +13,7 @@ deps = [":board"]
 name = "main"
 type = "library"
 srcs = ["main.py"]
-deps = [":board", "//shared:term", "//shared:input"]
+deps = [":board", ":nemo_adapter", "//nemo:ui", "//shared:term", "//shared:input"]
 
 [[target]]
 name = "main_test"
