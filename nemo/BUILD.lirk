@@ -5,3 +5,15 @@
 name = "nemo"
 type = "library"
 srcs = ["__init__.py"]
+
+[[target]]
+name = "ui"
+type = "library"
+srcs = ["ui.py"]
+deps = [":nemo", "//nemo/search:minimax", "//nemo/cam:avatar", "//shared:input"]
+
+[[target]]
+name = "ui_test"
+type = "test"
+srcs = ["ui_test.py"]
+deps = [":ui"]
