@@ -7,6 +7,7 @@ import camp
 import cats
 import clans
 import events
+import tables
 import territory
 import upkeep
 import weather
@@ -464,24 +465,30 @@ class AdvanceDayPhaseCTest(unittest.TestCase):
         rng = _FakeRng(randoms=_QUIET_RANDOMS + [0.1], randints=[0])
         return advance_day(state, actions, rng)
 
+    # Raid and gift sizes come from data/border.json, so rebalancing the
+    # table doesn't break these; they pin the rules, not the numbers.
+    _RAID = -tables.BORDER["hostile"]["food"]
+    _GIFT = tables.BORDER["friendly"]["water"]
+
     def test_a_hostile_rival_raids_and_it_is_logged(self):
         updated = self._raid({})
-        self.assertEqual(updated["food"], 5 - 2 * upkeep.FOOD_PER_CAT - 2)
+        self.assertEqual(updated["food"], max(0, 5 - 2 * upkeep.FOOD_PER_CAT - self._RAID))
         self.assertEqual(updated["event_log"][-1]["id"], "raid")
         self.assertIn("Iron Ridge", updated["event_log"][-1]["text"])
 
     def test_a_patrol_and_a_lookout_each_halve_a_raid(self):
         base = 5 - 2 * upkeep.FOOD_PER_CAT
         patrol = {"patrol": {"zone": "home"}}
-        self.assertEqual(self._raid(patrol)["food"], base - 1)
-        self.assertEqual(self._raid({}, ["lookout"])["food"], base - 1)
-        self.assertEqual(self._raid(patrol, ["lookout"])["food"], base)
+        self.assertEqual(self._raid(patrol)["food"], base - self._RAID // 2)
+        self.assertEqual(self._raid({}, ["lookout"])["food"], base - self._RAID // 2)
+        self.assertEqual(self._raid(patrol, ["lookout"])["food"],
+                         base - self._RAID // 2 // 2)
 
     def test_a_friendly_rival_shares_water(self):
         state = _fixture_state(other_clans=[clans.new_clan("Iron Ridge", 60)])
         rng = _FakeRng(randoms=_QUIET_RANDOMS + [0.1], randints=[0])
         updated = advance_day(state, {}, rng)
-        self.assertEqual(updated["water"], 5 - 2 * upkeep.WATER_PER_CAT + 1)
+        self.assertEqual(updated["water"], 5 - 2 * upkeep.WATER_PER_CAT + self._GIFT)
         self.assertEqual(updated["event_log"][-1]["id"], "gift")
 
 class AdvanceDayPropertyTest(unittest.TestCase):
