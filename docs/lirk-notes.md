@@ -15,7 +15,7 @@ written down. Fixes on this side are on branch
 
 | # | Finding | Severity | Side | Status |
 |---|---|---|---|---|
-| 1 | Stale PASS: an edge loaded by file path (`importlib`) is invisible to the import check | High | both | fixed here; lirk gap open |
+| 1 | Stale PASS: an edge loaded by file path (`importlib`) is invisible to the import check | High | both | fixed here; closed in lirk 1.1.0 |
 | 2 | Tests deleted the player's real save, and failed when one existed | Medium | here | fixed |
 | 3 | No `.lirk-root`, so running from a package dir broke the graph | Low | here | fixed |
 | — | Everything else checked out — see "What held up" | — | — | — |
@@ -56,8 +56,9 @@ default path (`lirk test`) gives the wrong green.
 **Fixed here** by declaring `//region-explorer:runner` and
 `//region-explorer/data:washington` on `//furminal:runner` (`44d53d4`).
 
-**How it was found, and a standing check.**
-`scripts/lirk-stale-sweep.py` (`36822be`) does it systematically: in a
+**How it was found.**
+`scripts/lirk-stale-sweep.py` (`36822be`, since removed in favour of
+`lirk verify --mutate`) did it systematically: in a
 throwaway copy, for each `library` src, prepend a top-level `raise`,
 run `lirk test //...`, and `--force` every test that stayed `cached`.
 A FAIL there is a stale edge. On the pre-fix commit it exits 1 naming
@@ -145,3 +146,44 @@ marker for new repos.
 - **Undeclared `.py` files:** only `scripts/lirk-stale-sweep.py` and
   the Please-era `tools/plz_test_runner/runner.py`, both tooling that
   no target imports.
+
+## Update: lirk 1.1.0 (2026-11-21)
+
+Both lirk-side suggestions from finding 1 shipped in v1.1.0
+(`e09c6fd`), and TASKS.md's criterion 2 now carries a correction for
+the broken zero-cache-bug record. Checked here against both commits:
+
+- **Build note:** `lirk build` flags `furminal/runner.py`'s
+  `spec_from_file_location`. It shows on the fixed tree too, as
+  intended (a declared load looks the same).
+- **`lirk verify --mutate`:** on `9786a9b` (pre-fix) it reports exactly
+  the three edges and exits 1 (984 test runs, ~2 min here); on this
+  branch, 0 edges, exit 0. It replaces `scripts/lirk-stale-sweep.py`,
+  which has been deleted.
+- 66/66 build, 32/32 test on 1.1.0.
+
+**Still open on the lirk side** (requests sent back, see below):
+
+1. **`--mutate` is far too slow for the device.** It isn't incremental:
+   every run breaks every library src and reruns every test that
+   doesn't claim the edge. 984 runs here at ~2 min; on iSH, where one
+   test subprocess is ~2-4s, that's plausibly 30-60 min. Ask: remember
+   which (src, test) pairs were checked against which fingerprints and
+   skip them next time, or a `--changed` scope that only breaks srcs
+   edited since the last clean run.
+2. **The subdirectory error still doesn't point at the cause.** Without
+   `.lirk-root`, from `furminal/`: `//:runner: dependency
+   '//shared:term' does not exist`. The "no .lirk-root found" note is
+   printed separately, two lines up. Ask: when a dep is missing *and*
+   no marker was found, say so in the error itself ("no .lirk-root, so
+   the root is furminal/; run from the repo root or add one").
+3. **Tests that write into the source tree (finding 2).** Still
+   undetected. Ask (optional, fits DESIGN §1): after a test target
+   runs, note any file created or deleted under its package directory
+   (a before/after listing; no sandbox). That would have caught the
+   save-file deletion here, and it's the data-file blind spot
+   `--mutate` documents.
+4. **A way to quiet a checked note.** Minor: the file-path note fires
+   on every rebuild of `//furminal:runner` even though its deps are now
+   right. Something like recording that `--mutate` last passed for the
+   target would let the note go quiet until the src changes.

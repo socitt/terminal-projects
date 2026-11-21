@@ -1572,3 +1572,12 @@ being run against any of it. Full write-up, aimed at the lirk repo, is
   call, not this repo's.
 - Otherwise unchanged from the 2026-07-30 entry: furminal Phase C, or
   the `docs/USER_TESTING.md` backlog ("Nemo" opponent etc.).
+
+## Done (2026-11-21, same session): lirk 1.1.0 closes finding 1
+
+lirk v1.1.0 shipped both suggestions (build note for file-path loads,
+`lirk verify --mutate`), verified here: 3 edges on the pre-fix commit,
+0 on this branch. `scripts/lirk-stale-sweep.py` deleted in favour of
+`lirk verify --mutate`. Four remaining asks for lirk recorded at the end
+of `docs/lirk-notes.md` (incremental `--mutate`, a clearer missing-root
+error, a source-tree-write note, quieting a checked note).
