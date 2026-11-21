@@ -1,7 +1,7 @@
 """Integration test for main.py: runs the real script -- real
-region-explorer map data, real `random`, the real save path next to
-main.py -- with piped stdin, same style as region-explorer's and the
-adventure-engine stories' main_test.py.
+region-explorer map data, real `random`, a private save path (via
+`TP_SAVE_PATH`) -- with piped stdin, same style as region-explorer's
+and the adventure-engine stories' main_test.py.
 
 What only this layer can cover is the start flow: region-explorer's
 zoom UI driven all the way to a settled region, then a camp spot, then
@@ -17,13 +17,18 @@ a whole game runs start to finish through the real entrypoint.
 """
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 MAIN = Path(__file__).resolve().parent / "main.py"
-SAVE = Path(__file__).resolve().parent / "save.json"
+# A private save slot, so a test run never reads or deletes the player's
+# real save next to main.py (main.py honours TP_SAVE_PATH).
+_SAVE_DIR = tempfile.TemporaryDirectory(prefix="tp-save-")
+SAVE = Path(_SAVE_DIR.name) / "save.json"
 
 # Olympic Peninsula, no zoom animation (which would sleep for real),
 # settle there, first camp spot, clan name.
@@ -42,7 +47,12 @@ def _run(input_text, timeout=60):
         capture_output=True,
         text=True,
         timeout=timeout,
+        env={**os.environ, "TP_SAVE_PATH": str(SAVE)},
     )
+
+
+def tearDownModule():
+    _SAVE_DIR.cleanup()
 
 
 class MainEndToEndTest(unittest.TestCase):

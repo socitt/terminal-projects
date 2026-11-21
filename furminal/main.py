@@ -5,8 +5,12 @@ save path and wires the start flow to the day loop.
 The save path is `save.json` next to this file, the same convention as
 `adventure-engine`'s stories. There is one save slot per install, not
 per clan: v1 plays one clan at a time.
+
+`TP_SAVE_PATH`, if set, overrides it. Tests set it so a test run never
+reads or deletes the player's real save.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -15,7 +19,7 @@ sys.path.insert(0, str(_FURMINAL_DIR))
 
 from runner import run, start_flow
 
-SAVE_PATH = _FURMINAL_DIR / "save.json"
+SAVE_PATH = Path(os.environ.get("TP_SAVE_PATH") or _FURMINAL_DIR / "save.json")
 
 
 def main():
