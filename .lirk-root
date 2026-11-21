@@ -1,0 +1,4 @@
+# lirk repo-root marker. Lets `lirk build`/`lirk test` run from any
+# package directory (e.g. `cd furminal && lirk test //furminal/...`):
+# without it lirk treats the current directory as the repo root and every
+# cross-package label, like //shared:term, looks missing.
