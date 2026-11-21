@@ -11,8 +11,10 @@ An adapter is any object (in practice a module) with:
   from `player`'s point of view, roughly within [-1, 1];
 - `HARD_DEPTH` -> how many plies the hard level searches;
 - `STOCHASTIC` (optional, default False) -> True when the opponent's
-  options depend on chance (dice), so looking at their reply is
-  meaningless; medium and hard then judge a move by `evaluate` alone.
+  options depend on chance (dice), so their reply can't be searched.
+  The search then stops at every change of turn and scores the
+  position there with `evaluate`, while still searching through the
+  mover's own kept turns (the rest of a backgammon roll).
 
 Levels (docs/USER_TESTING.md):
 
@@ -41,6 +43,18 @@ def _terminal_value(adapter, state, player, depth_left):
     return WIN + depth_left if result == player else -WIN - depth_left
 
 
+def _child_value(adapter, player, child, depth, alpha, beta):
+    """Value of `child` for `player`, who just moved into it, searching
+    `depth` more plies."""
+    if adapter.outcome(child) is not None:
+        return _terminal_value(adapter, child, player, depth)
+    if adapter.to_move(child) == player:
+        return _negamax(adapter, child, depth, alpha, beta)
+    if depth == 0 or getattr(adapter, "STOCHASTIC", False):
+        return adapter.evaluate(child, player)
+    return -_negamax(adapter, child, depth, -beta, -alpha)
+
+
 def _negamax(adapter, state, depth, alpha, beta):
     player = adapter.to_move(state)
     if adapter.outcome(state) is not None:
@@ -49,11 +63,8 @@ def _negamax(adapter, state, depth, alpha, beta):
         return adapter.evaluate(state, player)
     best = -float("inf")
     for move in adapter.moves(state):
-        child = adapter.play(state, move)
-        if adapter.to_move(child) == player:
-            value = _negamax(adapter, child, depth - 1, alpha, beta)
-        else:
-            value = -_negamax(adapter, child, depth - 1, -beta, -alpha)
+        value = _child_value(adapter, player, adapter.play(state, move),
+                             depth - 1, alpha, beta)
         best = max(best, value)
         alpha = max(alpha, value)
         if alpha >= beta:
@@ -62,22 +73,15 @@ def _negamax(adapter, state, depth, alpha, beta):
 
 
 def score_moves(adapter, state, depth):
-    """[(value, move)] for every move, from the mover's point of view.
-    Exposed for tests and for the Nemo cam's mood."""
+    """[(value, move)] for every move, from the mover's point of view,
+    searching `depth` plies in all (so depth 1 judges each move by the
+    position it leads to). Exposed for tests and for the Nemo cam."""
     player = adapter.to_move(state)
-    scored = []
-    for move in adapter.moves(state):
-        child = adapter.play(state, move)
-        if adapter.outcome(child) is not None:
-            value = _terminal_value(adapter, child, player, depth)
-        elif depth <= 1 or getattr(adapter, "STOCHASTIC", False):
-            value = adapter.evaluate(child, player)
-        elif adapter.to_move(child) == player:
-            value = _negamax(adapter, child, depth - 1, -float("inf"), float("inf"))
-        else:
-            value = -_negamax(adapter, child, depth - 1, -float("inf"), float("inf"))
-        scored.append((value, move))
-    return scored
+    return [
+        (_child_value(adapter, player, adapter.play(state, move), depth - 1,
+                      -float("inf"), float("inf")), move)
+        for move in adapter.moves(state)
+    ]
 
 
 def _wins_now(adapter, state, move, player):

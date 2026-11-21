@@ -154,6 +154,49 @@ class ExtraTurnTest(unittest.TestCase):
             minimax.choose_move(adapter, "start", nemo.HARD, random.Random(0)),
             "b")
 
+class StochasticTest(unittest.TestCase):
+    """Dice games: search the mover's own kept turns, stop at a turn
+    change and evaluate there instead of guessing the opponent's roll."""
+
+    def _game(self):
+        # Two dice for player 0. "safe" then "safe" ends level; "risky"
+        # first looks bad but sets up "big", the best finish of the turn.
+        nxt = {("start", "safe"): "s1", ("start", "risky"): "r1",
+               ("s1", "safe"): "end_ok", ("r1", "big"): "end_great",
+               ("r1", "safe"): "end_bad"}
+        values = {"s1": 0.1, "r1": -0.5, "end_ok": 0.2, "end_great": 0.9,
+                  "end_bad": -0.9}
+        calls = []
+
+        def to_move(s):
+            return 1 if s.startswith("end") else 0
+
+        def evaluate(s, p):
+            calls.append(s)
+            return values[s] if p == 0 else -values[s]
+
+        adapter = SimpleNamespace(
+            moves=lambda s: {"start": ["safe", "risky"], "s1": ["safe"],
+                             "r1": ["safe", "big"]}[s],
+            play=lambda s, m: nxt[(s, m)],
+            to_move=to_move, outcome=lambda s: None,
+            evaluate=evaluate, HARD_DEPTH=3, STOCHASTIC=True,
+        )
+        return adapter, calls
+
+    def test_hard_searches_the_rest_of_its_own_roll(self):
+        adapter, _ = self._game()
+        self.assertEqual(
+            minimax.choose_move(adapter, "start", nemo.HARD, random.Random(0)),
+            "risky")
+
+    def test_search_never_looks_past_the_turn_change(self):
+        # The opponent's states have no moves defined: recursing into one
+        # would raise KeyError. Every turn-ending state is evaluated.
+        adapter, calls = self._game()
+        minimax.choose_move(adapter, "start", nemo.HARD, random.Random(0))
+        self.assertTrue({"end_ok", "end_great", "end_bad"} <= set(calls))
+
 class GuardTest(unittest.TestCase):
     def test_unknown_level_is_rejected(self):
         with self.assertRaises(ValueError):
