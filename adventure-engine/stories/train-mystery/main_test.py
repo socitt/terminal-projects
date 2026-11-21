@@ -4,13 +4,18 @@ main_test.py. Each scenario was hand-verified live against the real
 script first, same discipline as dungeon's main_test.py.
 """
 
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 MAIN = Path(__file__).resolve().parent / "main.py"
-SAVE = Path(__file__).resolve().parent / "save.json"
+# A private save slot, so a test run never reads or deletes the player's
+# real save next to main.py (main.py honours TP_SAVE_PATH).
+_SAVE_DIR = tempfile.TemporaryDirectory(prefix="tp-save-")
+SAVE = Path(_SAVE_DIR.name) / "save.json"
 
 
 def _run(input_text, timeout=10):
@@ -20,7 +25,12 @@ def _run(input_text, timeout=10):
         capture_output=True,
         text=True,
         timeout=timeout,
+        env={**os.environ, "TP_SAVE_PATH": str(SAVE)},
     )
+
+
+def tearDownModule():
+    _SAVE_DIR.cleanup()
 
 
 class TrainMysteryEndToEndTest(unittest.TestCase):
