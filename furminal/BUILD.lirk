@@ -128,7 +128,7 @@ srcs = ["runner.py"]
 # (`_load_module`, via importlib), which lirk's import check cannot see,
 # so these two edges have to be declared by hand. Without them, editing
 # region-explorer left //furminal:main_test `cached` and green while
-# `--force` failed -- see docs/KNOWN_ISSUES.md.
+# `--force` failed -- see docs/lirk-notes.md.
 deps = [
     ":camp", ":clans", ":game", ":territory", "//shared:term", "//shared:input",
     "//region-explorer:runner", "//region-explorer/data:washington",
