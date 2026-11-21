@@ -1,16 +1,20 @@
 """Backgammon: terminal entrypoint for narrow screens, iOS on-screen
 keyboard (single key + Enter, no arrow/modifier chords).
+
+The game opens by asking for an opponent: a second human on the same
+screen, or Nemo (nemo/) at one of three levels. Nemo plays O.
 """
 
-import random
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from nemo import ui as nemo_ui
 from shared import input as input_module
 from shared import term
 
+import nemo_adapter
 from board import (
     bear_off,
     dice_to_moves,
@@ -25,6 +29,8 @@ from board import (
     roll_dice,
     winner,
 )
+
+NEMO_PLAYER = "O"
 
 
 def _cell(state, point):
@@ -85,19 +91,43 @@ def _play_die(state, player, die):
     return _apply(state, player, actions[int(key) - 1], die)
 
 
+def _nemo_die(state, dice_left, level, rng):
+    """Nemo plays the first of `dice_left`; returns (state, note lines)."""
+    action, cam = nemo_ui.take_turn(
+        nemo_adapter, (state, NEMO_PLAYER, dice_left), level, rng)
+    die = dice_left[0]
+    if action == nemo_adapter.SKIP:
+        return state, cam + [f"Nemo can't use the {die}."]
+    return _apply(state, NEMO_PLAYER, action, die), cam + [
+        f"Nemo: {_describe(action)} ({die})"]
+
+
 def main():
+    level = nemo_ui.prompt_opponent()
+    # One rng for dice and Nemo alike, so TP_NEMO_SEED repeats a game.
+    rng = nemo_ui.make_rng()
     state = new_game()
     turn = "X"
+    notes = []
     while True:
-        d1, d2 = roll_dice(random)
-        for die in dice_to_moves(d1, d2):
+        d1, d2 = roll_dice(rng)
+        dice = dice_to_moves(d1, d2)
+        for i, die in enumerate(dice):
             term.clear_screen()
             print(render(state))
+            for line in notes:
+                print(line)
+            notes = []
             print(f"\n{turn}'s turn. Dice: {d1} {d2}")
-            state = _play_die(state, turn, die)
+            if level is not nemo_ui.HUMAN and turn == NEMO_PLAYER:
+                state, notes = _nemo_die(state, tuple(dice[i:]), level, rng)
+            else:
+                state = _play_die(state, turn, die)
             if is_game_over(state):
                 term.clear_screen()
                 print(render(state))
+                for line in notes:
+                    print(line)
                 print(f"\n{winner(state)} wins!")
                 return
         turn = opponent(turn)
