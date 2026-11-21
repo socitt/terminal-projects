@@ -1,0 +1,12 @@
+{
+  "keen-eyed": {"hunt_food_bonus": 1},
+  "quick": {"hunt_food_bonus": 1},
+  "fierce": {"hunt_food_bonus": 1, "leader_drift": -1},
+  "cautious": {"hunt_injury_scale": 0.0},
+  "brave": {"hunt_injury_scale": 0.5},
+  "patient": {"recovery_bonus": 0.1},
+  "stubborn": {"recovery_bonus": 0.1},
+  "gentle": {"leader_drift": 1},
+  "loyal": {"leader_drift": 1},
+  "gruff": {"leader_drift": -1}
+}

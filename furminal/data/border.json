@@ -1,0 +1,14 @@
+{
+  "hostile": {
+    "chance": 0.3,
+    "food": -2,
+    "water": 0,
+    "text": "{rival} raided the fresh-kill pile."
+  },
+  "friendly": {
+    "chance": 0.2,
+    "food": 0,
+    "water": 1,
+    "text": "{rival} shared water at the border."
+  }
+}

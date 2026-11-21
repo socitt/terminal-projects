@@ -1,0 +1,32 @@
+{
+  "nursery": {
+    "name": "Nursery",
+    "description": "A sheltered den for queens and kits.",
+    "cost": {
+      "food": 3
+    },
+    "effects": {
+      "birth_chance_bonus": 0.1
+    }
+  },
+  "herb_store": {
+    "name": "Herb Store",
+    "description": "A dry, sorted stock of the healer's herbs.",
+    "cost": {
+      "food": 2
+    },
+    "effects": {
+      "recovery_bonus": 0.15
+    }
+  },
+  "lookout": {
+    "name": "Lookout",
+    "description": "A high perch that spots raiders early.",
+    "cost": {
+      "food": 2
+    },
+    "effects": {
+      "raid_shield": 1
+    }
+  }
+}

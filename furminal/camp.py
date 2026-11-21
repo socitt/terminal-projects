@@ -2,24 +2,19 @@
 
 Per the v1 scope there is no building tree — each structure in
 `STRUCTURES` can be unlocked independently, with no prerequisites.
-Costs/timing for *when* a structure gets unlocked belong to the
-orchestrating `game.py`; this module only knows the catalog and the
-pure state transition.
+This module only knows the catalog and the pure state transition.
 
 Camp dict shape (JSON-serializable, `game_state["camp"]`):
     {"structures": ["nursery", ...]}   # unlocked structure ids
+
+The catalog -- names, costs, effects -- lives in
+`data/structures.json` (Phase C), loaded by `tables.py`. Paying the
+cost and applying the effects are `game.py`'s job.
 """
 
-STRUCTURES = {
-    "nursery": {
-        "name": "Nursery",
-        "description": "A sheltered den for queens and kits.",
-    },
-    "herb_store": {
-        "name": "Herb Store",
-        "description": "A dry, sorted stock of the healer's herbs.",
-    },
-}
+import tables
+
+STRUCTURES = tables.STRUCTURES
 
 
 def new_camp():

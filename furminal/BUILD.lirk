@@ -13,6 +13,7 @@ deps = [":cats"]
 name = "camp"
 type = "library"
 srcs = ["camp.py"]
+deps = [":tables"]
 
 [[target]]
 name = "camp_test"
@@ -151,3 +152,18 @@ name = "main_test"
 type = "test"
 srcs = ["main_test.py"]
 deps = [":main"]
+
+# Phase C's tuning tables. `data` makes the JSON part of this target's
+# fingerprint, and so of everything that depends on it: lirk's import
+# check can't see a file that's only ever read.
+[[target]]
+name = "tables"
+type = "library"
+srcs = ["tables.py"]
+data = ["data"]
+
+[[target]]
+name = "tables_test"
+type = "test"
+srcs = ["tables_test.py"]
+deps = [":tables", ":cats"]
