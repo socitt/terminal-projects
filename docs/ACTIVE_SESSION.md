@@ -1532,3 +1532,43 @@ Nothing is blocked. Two candidate directions:
   out-of-range column-input bug, missing rematch prompts, the self-loop
   choice UX gap in both stories, and the requested storyboarding
   sessions.
+
+## Done (2026-11-21, new session): lirk hardening — re-dogfooding against lirk 1.0.1
+
+Branch `claude/terminal-lirk-hardening-bd85zc`. lirk had moved from 0.x
+to 1.0.1 (environment fingerprinting, `verify`, `fix`, `init`, pytest
+runner, timings) without this repo — its first and largest consumer —
+being run against any of it. Full write-up, aimed at the lirk repo, is
+`docs/lirk-notes.md`; this entry is the resume point.
+
+- **Stale PASS found and fixed** (`44d53d4`). `furminal/runner.py`
+  loads region-explorer's runner and map data by file path
+  (`importlib`), which lirk's import check can't see, and
+  `//furminal:runner` didn't declare them. Breaking region-explorer left
+  `//furminal:main_test` cached and green; `--force` failed it 4/4. Live
+  since Phase B (2026-07-30). `lirk verify` does catch it.
+- **`scripts/lirk-stale-sweep.py`** (`36822be`): breaks each library src
+  in a throwaway copy and force-reruns every test lirk still calls
+  cached. Exits 1 naming the three edges on the pre-fix commit, 0 now.
+  Re-run it whenever a cross-package edge is added that isn't a plain
+  `import`.
+- **Tests no longer touch the player's save** (`c330f15`, `e1d4510`,
+  `ee76ff9`). furminal/dungeon/train-mystery `main_test.py` used the
+  real `save.json` and deleted it; with a save present, both story
+  tests also failed. `main.py` now honours `TP_SAVE_PATH`; tests use a
+  temp dir. Mutation-checked.
+- **`.lirk-root` added** (`8ebe0bb`): `lirk` now works from any package
+  directory.
+- **Held up:** 66/66 build, 32/32 test; 13/13 forced full runs incl. 3
+  under 2× CPU load; 32/32 on Python 3.11, 3.12, 3.13; R1 reruns on an
+  interpreter switch; `verify` 98/0 stale; `fix` no-op; `init` from zero
+  BUILD files drafted a 12/12-green graph with no hand fixes.
+
+## Next up
+
+- **Take `docs/lirk-notes.md` to the lirk repo.** Its two suggestions
+  (a build note for `spec_from_file_location`/`runpy`-style loads; the
+  mutation sweep as a lirk mode) and the criterion-2 record are lirk's
+  call, not this repo's.
+- Otherwise unchanged from the 2026-07-30 entry: furminal Phase C, or
+  the `docs/USER_TESTING.md` backlog ("Nemo" opponent etc.).
