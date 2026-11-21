@@ -135,6 +135,8 @@ request rather than repeating it five times:
   story/decision trees -- not started, to be done as back-and-forth
   design conversations before new `story.py` content is written.
 - "Nemo" computer opponent (all difficulty levels, all five board
-  games) -- not started.
-- "Nemo cam" reactive ASCII avatar -- stretch, after the plain
-  computer opponent exists.
+  games) -- **built 2026-11-21** (`nemo/`, plus `nemo_adapter.py` in
+  each game). Still needs the human playtesting pass called for above
+  before it counts as done.
+- "Nemo cam" reactive ASCII avatar -- **built 2026-11-21**
+  (`nemo/cam/avatar.py`), shown under the board on Nemo's turns.

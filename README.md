@@ -47,6 +47,9 @@ inline in that part of the repo.
 - `adventure-engine/` — text adventure engine, with individual stories
   under `adventure-engine/stories/` (dungeon, train-mystery).
 - `region-explorer/` — WA state ASCII zoom map.
+- `nemo/` — "Nemo", the computer opponent every board game offers:
+  a game-agnostic search (`nemo.search`), the Nemo cam (`nemo.cam`) and
+  the shared prompt (`nemo.ui`). Each game supplies a small adapter.
 - `furminal/` — cat-clan colony sim (formerly `clanhold`), builds on
   `region-explorer`.
 - `docs/ACTIVE_SESSION.md` — running session log, used to resume work
