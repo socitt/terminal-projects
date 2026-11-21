@@ -20,3 +20,15 @@ name = "main_test"
 type = "test"
 srcs = ["main_test.py"]
 deps = [":main"]
+
+[[target]]
+name = "nemo_adapter"
+type = "library"
+srcs = ["nemo_adapter.py"]
+deps = [":board"]
+
+[[target]]
+name = "nemo_adapter_test"
+type = "test"
+srcs = ["nemo_adapter_test.py"]
+deps = [":nemo_adapter", "//nemo/search:minimax"]
